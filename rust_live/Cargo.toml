@@ -2,6 +2,7 @@
 name = "rust_live"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 rust_core = { path = "../rust_core" }

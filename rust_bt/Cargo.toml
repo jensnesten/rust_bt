@@ -2,9 +2,7 @@
 name = "rust_bt"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
-description = "A Rust implementation of the Python backtesting.py framework"
-license = "AGPL-3.0"
+license = "MIT"
 
 [dependencies]
 # for numerical operations

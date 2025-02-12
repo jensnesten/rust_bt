@@ -21,7 +21,7 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 
 ## Usage
 
-Strategies are implemented by creating a new struct in `src/strategies/` that implements the `Strategy` trait:
+Strategies are implemented by creating a new struct in `rust_core/src/strategies/` that implements the `Strategy` trait:
 
 ```rust
 pub struct MyStrategy;
