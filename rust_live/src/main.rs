@@ -1,3 +1,6 @@
+use rust_live::stream::single;
+
 fn main() {
-    println!("Hello, world!");
+    tokio::runtime::Runtime::new().unwrap().block_on(single());
 }
+    
