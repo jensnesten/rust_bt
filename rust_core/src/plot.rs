@@ -29,8 +29,8 @@ pub fn plot_equity(data: &[(NaiveDateTime, f64)], output_path: &str) -> Result<(
     // configure the mesh for the chart and add a custom x-axis label formatter
     chart.configure_mesh()
         .x_label_formatter(&|x| {
-            // convert timestamp to naivedatetime and format as desired
-            let dt = NaiveDateTime::from_timestamp_opt(*x, 0).unwrap_or_default();
+            // convert timestamp to datetime
+            let dt = NaiveDateTime::from_timestamp(*x, 0);
             dt.format("%Y-%m-%d").to_string()
         })
         .x_labels(5)
@@ -105,8 +105,8 @@ pub fn plot_equity_and_benchmark(
     chart
         .configure_mesh()
         .x_label_formatter(&|x| {
-            // convert the timestamp back into a datetime for a formatted string
-            let dt = NaiveDateTime::from_timestamp_opt(*x, 0).unwrap_or_default();
+            // convert timestamp to datetime
+            let dt = NaiveDateTime::from_timestamp(*x, 0);
             dt.format("%Y-%m-%d").to_string()
         })
         .x_labels(5)
@@ -181,8 +181,8 @@ pub fn plot_margin_usage(data: &[(NaiveDateTime, f64)], output_path: &str) -> Re
     // configure the mesh for the chart and add a custom x-axis label formatter
     chart.configure_mesh()
         .x_label_formatter(&|x| {
-            // convert timestamp to naivedatetime and format as desired
-            let dt = NaiveDateTime::from_timestamp_opt(*x, 0).unwrap_or_default();
+            // convert timestamp to datetime
+            let dt = NaiveDateTime::from_timestamp(*x, 0);
             dt.format("%Y-%m-%d").to_string()
         })
         .x_labels(5)

@@ -22,14 +22,14 @@ fn main() {
     let cash = 100_000.0;
     let commission = 0.0;
     let bidask_spread = 0.0;
-    let margin = 0.05;
+    let margin = 0.5;
     let trade_on_close = false;
     let hedging = false;
     let exclusive_orders = false;
     let scaling_enabled = true;
 
     // boxed instance of strategy
-    let strategy: Box<dyn Strategy> = Box::new(ScaledStatArbPairsStrategy::new());
+    let strategy: Box<dyn Strategy> = Box::new(StatArbPairsStrategy::new());
 
     let mut backtest = Backtest::new(
         data,
