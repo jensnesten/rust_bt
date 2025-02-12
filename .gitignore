@@ -1,0 +1,36 @@
+rust_bt/data/*
+!rust_bt/data/SP500_DJIA_2m_clean.csv
+
+Cargo.lock
+
+rust_core/src/strategies/*
+!rust_core/src/strategies/sma.rs
+!rust_core/src/strategies/simple_strategy.rs
+# Build output
+target/
+dist/
+build/
+
+# Dependencies
+node_modules/
+vendor/
+
+.DS_Store
+
+# IDE specific
+.idea/
+.vscode/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Environment files
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+

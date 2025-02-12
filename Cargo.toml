@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "rust_core",
+    "rust_bt",
+    "rust_live",
+
+]
