@@ -1,9 +1,11 @@
 use csv::ReaderBuilder;
 use std::error::Error;
 use crate::engine::OhlcData;
+use crate::engine::LiveData;
+use serde_json::Value;
 
 // data handler for simple csv
-pub fn load_csv(path: &str) -> Result<OhlcData, Box<dyn Error>> {
+pub fn handle_ohlc(path: &str) -> Result<OhlcData, Box<dyn Error>> {
     let mut rdr = ReaderBuilder::new()
         .has_headers(true)
         .from_path(path)?;
@@ -39,4 +41,45 @@ pub fn load_csv(path: &str) -> Result<OhlcData, Box<dyn Error>> {
         close2,
         volume: None,
     })
+}
+
+pub fn parse_live_data(raw: &str) -> LiveData {
+    // create a LiveData instance with vector fields
+    let mut live_data = LiveData {
+        instrument: Vec::new(),
+        date: Vec::new(),
+        ask: Vec::new(),
+        bid: Vec::new(),
+    };
+
+    // find the first occurrence of '{'
+    if let Some(idx) = raw.find('{') {
+        // everything before the '{' is assumed to be the instrument code
+        let instrument = raw[..idx]
+            .trim_matches(|c: char| !c.is_alphanumeric())
+            .to_string();
+        // the json_str starts from the '{'
+        let json_str = &raw[idx..];
+
+        if let Ok(parsed) = serde_json::from_str::<Value>(json_str) {
+            if let Some(quote) = parsed.get("Quote") {
+                if let (Some(ask_val), Some(bid_val)) = (
+                    quote.get("Ask").and_then(|v| v.as_f64()),
+                    quote.get("Bid").and_then(|v| v.as_f64()),
+                ) {
+                    live_data.instrument.push(instrument);
+                    live_data.date.push(
+                        parsed
+                            .get("LastUpdated")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                    );
+                    live_data.ask.push(ask_val);
+                    live_data.bid.push(bid_val);
+                }
+            }
+        }
+    }
+    live_data
 }

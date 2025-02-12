@@ -5,9 +5,10 @@ use tungstenite::Message;
 use futures_util::StreamExt;
 use reqwest::Client;
 use chrono::Utc;
+use rust_core::data_handler::parse_live_data;
+use rust_core::engine::LiveData;
 
-pub async fn single() { 
-
+pub async fn single() -> Vec<LiveData> {
     dotenv().ok();
 
     // Load API credentials from .env
@@ -51,19 +52,25 @@ pub async fn single() {
         .send()
         .await
         .expect("Failed to send subscription request");
-    println!("Subscription response: {:?}", response.text().await.unwrap());
+    //println!("Subscription response: {:?}", response.text().await.unwrap());
    
+    let mut results: Vec<LiveData> = Vec::new();
+
     // Process incoming WebSocket messages and output the JSON response as-is.
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
                 // If the message is text, print it directly.
-                println!("Received JSON: {}", text);
+                let live_data = parse_live_data(&text);
+                results.push(live_data.clone());
+                //println!("Received JSON: {:?}", live_data);
             }
             Ok(Message::Binary(bin)) => {
                 // Convert binary data to a UTF-8 string.
                 let text = String::from_utf8_lossy(&bin);
-                println!("Received JSON: {}", text);
+                let live_data = parse_live_data(&text);
+                results.push(live_data.clone());
+                //println!("Received JSON: {:?}", live_data);
             }
             Ok(other) => {
                 println!("Received non-text message: {:?}", other);
@@ -73,6 +80,7 @@ pub async fn single() {
             }
         }
     }
+    results
 } 
 
 

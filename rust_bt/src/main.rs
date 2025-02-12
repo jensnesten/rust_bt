@@ -10,14 +10,14 @@ use rust_core::strategies::simple_strategy::SimpleStrategy;
 use rust_core::strategies::statarb_pairs::StatArbPairsStrategy;
 use rust_core::strategies::scaled_statarb_pairs::ScaledStatArbPairsStrategy;
 use rust_core::strategies::dynamic_pairs::DynamicPairsStrategy;
-use rust_core::data_handler::load_csv;
+use rust_core::data_handler::handle_ohlc;
 use std::time::Instant;
 
 fn main() {
     //start time
     let start = Instant::now();
 
-    let data = load_csv("/Users/jarlen/NHNTrading/rust_bt/rust_bt/data/SP500_DJIA_fyear_clean.csv").expect("Failed to load CSV data");
+    let data = handle_ohlc("/Users/jarlen/NHNTrading/rust_bt/rust_bt/data/SP500_DJIA_fyear_clean.csv").expect("Failed to load CSV data");
 
     let cash = 100_000.0;
     let commission = 0.0;
