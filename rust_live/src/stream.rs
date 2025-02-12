@@ -7,6 +7,7 @@ use reqwest::Client;
 use chrono::Utc;
 use rust_core::data_handler::parse_live_data;
 use rust_core::engine::LiveData;
+use tokio::sync::mpsc::UnboundedSender;
 
 pub async fn single() -> Vec<LiveData> {
     dotenv().ok();
@@ -70,7 +71,7 @@ pub async fn single() -> Vec<LiveData> {
                 let text = String::from_utf8_lossy(&bin);
                 let live_data = parse_live_data(&text);
                 results.push(live_data.clone());
-                //println!("Received JSON: {:?}", live_data);
+                println!("Received JSON: {:?}", live_data);
             }
             Ok(other) => {
                 println!("Received non-text message: {:?}", other);
@@ -173,6 +174,75 @@ pub async fn pairs() {
             }
             Err(e) => {
                 println!("WebSocket error: {:?}", e);
+            }
+        }
+    }
+}
+
+// continuously streams live data and sends parsed messages over the channel
+pub async fn stream_live_data(tx: UnboundedSender<LiveData>) {
+    dotenv().ok();
+
+    // load api credentials from .env
+    let access_token = env::var("ACCESS_TOKEN").expect("missing ACCESS_TOKEN in .env");
+    let account_key = env::var("ACCOUNT_KEY").expect("missing ACCOUNT_KEY in .env");
+    let client_key = env::var("CLIENT_KEY").expect("missing CLIENT_KEY in .env");
+
+    // build context id and streamer url
+    let context_id = format!("MyApp42069{}", Utc::now().timestamp_millis());
+    let streamer_url = format!(
+        "wss://streaming.saxobank.com/sim/openapi/streamingws/connect?authorization=BEARER%20{}&contextId={}",
+        access_token, context_id
+    );
+    println!("connecting to saxo bank websocket...");
+    let (ws_stream, _) = connect_async(&streamer_url)
+        .await
+        .expect("failed to connect: ensure tls is enabled");
+    println!("connected.");
+
+    // split the websocket stream into write (unused) and read parts
+    let (_write, mut read) = ws_stream.split();
+
+    // send the subscription request via HTTP POST
+    let subscription_payload = serde_json::json!({
+        "ContextId": context_id,
+        "RefreshRate": 1000,
+        "ReferenceId": "price",
+        "Arguments": {
+            "ClientKey": client_key,
+            "AccountKey": account_key,
+            "AssetType": "CfdOnIndex",
+            "Uic": 4913
+        }
+    });
+    let client = Client::new();
+    let _response = client
+        .post("https://gateway.saxobank.com/sim/openapi/trade/v1/prices/subscriptions")
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .json(&subscription_payload)
+        .send()
+        .await
+        .expect("failed to send subscription request");
+    // println!("subscription response: {:?}", response.text().await.unwrap());
+
+    // continuously process websocket messages
+    while let Some(msg) = read.next().await {
+        match msg {
+            Ok(Message::Text(text)) => {
+                let live_data = parse_live_data(&text);
+                let _ = tx.send(live_data);
+            }
+            Ok(Message::Binary(bin)) => {
+                let text = String::from_utf8_lossy(&bin);
+                let live_data = parse_live_data(&text);
+                let _ = tx.send(live_data);
+            }
+            Ok(other) => {
+                println!("received non-text message: {:?}", other);
+            }
+            Err(e) => {
+                println!("websocket error: {:?}", e);
             }
         }
     }

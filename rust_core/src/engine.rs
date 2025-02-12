@@ -13,6 +13,7 @@ use serde::{Serialize, Deserialize};
 use std::io::Write;
 use std::thread::sleep;
 use std::time::Duration;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 // define custom error for order margin check
 #[derive(Debug)]
@@ -120,7 +121,6 @@ impl Position {
 pub struct LiveBroker {
     pub live_data: LiveData,
     pub live_cash: f64,
-    pub live_bidask_spread: f64,
     pub live_margin: f64,     // margin ratio (0 < margin <= 1)
     pub live_trade_on_close: bool,
     pub live_hedging: bool,
@@ -143,7 +143,6 @@ impl LiveBroker {
     pub fn new(
         live_data: LiveData,
         live_cash: f64,
-        live_bidask_spread: f64,
         live_margin: f64,
         live_trade_on_close: bool,
         live_hedging: bool,
@@ -155,7 +154,6 @@ impl LiveBroker {
         LiveBroker {
             live_data: live_data,
             live_cash: live_cash,
-            live_bidask_spread: live_bidask_spread,
             live_margin: live_margin,
             live_trade_on_close: live_trade_on_close,
             live_hedging: live_hedging,
@@ -172,21 +170,6 @@ impl LiveBroker {
         }
     }
 
-    // adjusted_price: apply bid/ask spread adjustment (no commission)
-    pub fn adjusted_price(&self, size: f64, price: f64) -> f64 {
-        // add or subtract bidask spread based on order side
-        if self.live_bidask_spread > 0.0 {
-            if size > 0.0 {
-                price + self.live_bidask_spread
-            } else if size < 0.0 {
-                price - self.live_bidask_spread
-            } else {
-                price
-            }
-        } else {
-            price
-        }
-    }
 
     // new_order: place a new order into the live orders queue
     pub fn new_order(&mut self, mut order: Order, current_price: f64) -> Result<(), OrderError> {
@@ -309,17 +292,7 @@ impl LiveBroker {
 
         for order in orders_to_execute.iter() {
             // determine execution price: if a limit is specified, use that; otherwise use current prices,
-            // choosing previous prices if trade_on_close is enabled
-            let exec_price = if order.limit.is_some() {
-                order.limit.unwrap()
-            } else {
-                if order.size > 0.0 {
-                    if self.live_trade_on_close { prev_ask } else { current_ask }
-                } else {
-                    if self.live_trade_on_close { prev_bid } else { current_bid }
-                }
-            };
-            let adjusted_exec_price = self.adjusted_price(order.size, exec_price);
+    
 
             if let Some(parent_idx) = order.parent_trade {
                 // this is a contingent order meant to close an open trade
@@ -329,7 +302,7 @@ impl LiveBroker {
                         size: trade.size,
                         entry_price: trade.entry_price,
                         entry_index: trade.entry_index,
-                        exit_price: Some(adjusted_exec_price),
+                        exit_price: Some(current_ask),
                         exit_index: Some(index),
                         sl_order: trade.sl_order,
                         tp_order: trade.tp_order,
@@ -343,7 +316,7 @@ impl LiveBroker {
                 // open a new trade with the executed order
                 let trade = Trade {
                     size: order.size,
-                    entry_price: adjusted_exec_price,
+                    entry_price: current_bid,
                     entry_index: index,
                     exit_price: None,
                     exit_index: None,
@@ -402,7 +375,7 @@ impl LiveBroker {
         };
         let current_ask = self.live_data.ask[index];
         let current_bid = self.live_data.bid[index];
-        let spread = self.live_bidask_spread; // local copy avoids reborrowing self
+        let spread = current_ask - current_bid; // local copy avoids reborrowing self
         // calculate adjusted price inline without calling self.adjusted_price
         let exit_price = if trade.size > 0.0 {
             if spread > 0.0 { current_bid + spread } else { current_bid }
@@ -435,9 +408,9 @@ impl LiveBroker {
         let trades: Vec<_> = self.live_trades.drain(..).collect();
         for trade in trades {
             let exit_price = if trade.size > 0.0 {
-                self.adjusted_price(trade.size, current_bid)
+                current_ask
             } else {
-                self.adjusted_price(trade.size, current_ask)
+                current_bid
             };
             let closed_trade = Trade {
                 size: trade.size,
@@ -532,15 +505,14 @@ impl LiveBroker {
 
     // new method to print basic live trading stats in same console line
     pub fn print_live_stats(&self, tick: usize) {
-        // clear current line and update stats in place using carriage return and ansi clear line sequence
-        print!("\r\x1B[2K// tick: {} | cash: {:.2} | open trades: {} | closed trades: {} | equity: {:.2} | margin usage: {:.2}%",
+        // simple print line without ansi escape codes
+        println!("tick: {} | cash: {:.2} | open trades: {} | closed trades: {} | equity: {:.2} | margin usage: {:.2}%",
             tick,
             self.live_cash,
             self.live_trades.len(),
             self.live_closed_trades.len(),
             self.live_equity.last().unwrap_or(&self.live_cash),
             self.current_margin_usage() * 100.0);
-        std::io::stdout().flush().unwrap(); // flush to display immediately
     }
 }
 
@@ -1106,7 +1078,6 @@ impl LiveBacktest {
         live_data: LiveData,
         live_strategy: LiveStrategyRef,
         live_cash: f64,
-        live_bidask_spread: f64,
         live_margin: f64,
         live_trade_on_close: bool,
         live_hedging: bool,
@@ -1116,7 +1087,6 @@ impl LiveBacktest {
         let broker = LiveBroker::new(
             live_data.clone(),
             live_cash,
-            live_bidask_spread,                                                                                                  
             live_margin,
             live_trade_on_close,
             live_hedging,
@@ -1130,14 +1100,32 @@ impl LiveBacktest {
         }
     }
 
-    pub fn run(&mut self) {
+    // async run method to drive simulation on new incoming live data without artificial throttling
+    pub async fn run(&mut self, mut rx: UnboundedReceiver<LiveData>) {
+        println!("starting live simulation...");
+        // initialize strategy with initial live data
         self.strategy.init(&mut self.broker, &self.data);
-        let n = self.data.ask.len();
-        for index in 1..n {
-            self.broker.next(index);
-            self.strategy.next(&mut self.broker, index);
-            self.broker.print_live_stats(index);
-            sleep(Duration::from_millis(200)); // pause so you can actually see the update
+        
+        // continuously await new live data messages
+        while let Some(new_data) = rx.recv().await {
+            // record the current number of ticks before appending new data
+            let start_tick = self.broker.live_data.ask.len();
+            
+            // append incoming live data tick(s) to the broker's live data
+            self.broker.live_data.instrument.extend(new_data.instrument);
+            self.broker.live_data.date.extend(new_data.date);
+            self.broker.live_data.ask.extend(new_data.ask);
+            self.broker.live_data.bid.extend(new_data.bid);
+            
+            // determine new tick count after appending data
+            let end_tick = self.broker.live_data.ask.len();
+            
+            // process each newly appended tick
+            for tick in start_tick..end_tick {
+                self.broker.next(tick);
+                self.strategy.next(&mut self.broker, tick);
+                self.broker.print_live_stats(tick);
+            }
         }
     }
 }
@@ -1210,7 +1198,7 @@ impl Backtest {
 
         pb.set_message("Running backtest...");
         
-        for index in 1..n {
+        for index in 0..n {
             self.broker.next(index);
             self.strategy.next(&mut self.broker, index);
             pb.set_position(index as u64);
