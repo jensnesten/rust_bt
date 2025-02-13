@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 use rust_live::stream::stream_live_data;
-use rust_core::engine::{LiveBacktest, LiveData, LiveStrategyRef};
+use rust_core::live_engine::{LiveBacktest, LiveData, LiveStrategyRef};
 use rust_core::strategies::live_statarb_spread::LiveStatArbSpreadStrategy;
 
 #[tokio::main]

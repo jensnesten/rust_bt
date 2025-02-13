@@ -35,6 +35,10 @@ impl PositionManager {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.open_longs == 0 && self.open_shorts == 0
+    }
+
     // close a position
     pub fn close_position(&mut self, size: f64) {
         if size > 0.0 {

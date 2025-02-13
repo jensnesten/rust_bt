@@ -1,5 +1,6 @@
 // this library file publicly exports our modules
 pub mod engine;
+pub mod live_engine;
 pub mod strategies;
 pub mod util;
 pub mod stats;
