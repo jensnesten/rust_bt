@@ -3,6 +3,7 @@
 use crate::util::as_str;
 #[allow(unused_imports)]
 use std::cmp::Ordering;
+use std::thread::current;
 use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc::UnboundedReceiver;
 
@@ -160,17 +161,7 @@ impl LiveBroker {
         if self.live_scaling_enabled {
             order.size = self.scale_order_size(order.size);
         }
-        // adjust order size for hedge instrument (approximate using ask and bid)
-        if order.instrument == 2 {
-            // use current ask and bid as proxies; beware division by zero
-            let last_index = self.live_data.ask.len().saturating_sub(1);
-            let primary_price = self.live_data.ask[last_index];
-            let hedge_price = self.live_data.bid[last_index];
-            if hedge_price != 0.0 {
-                let factor = primary_price / hedge_price;
-                order.size *= factor;
-            }
-        }
+      
         // check for sufficient buying power
         let order_notional = order.size.abs() * current_price;
         let available = self.available_buying_power();
@@ -211,8 +202,7 @@ impl LiveBroker {
         // get current prices from live data
         let current_ask = self.live_data.ask[index];
         let current_bid = self.live_data.bid[index];
-        let prev_ask = if index > 0 { self.live_data.ask[index - 1] } else { current_ask };
-        let prev_bid = if index > 0 { self.live_data.bid[index - 1] } else { current_bid };
+
 
         let mut executed_order_indices: Vec<usize> = Vec::new();
 
@@ -290,6 +280,7 @@ impl LiveBroker {
                     // update available cash with pnl from closed trade
                     self.live_cash += closed_trade.pnl();
                     self.closed_trades.push(closed_trade);
+                    println!("closed trade: {}", current_ask); // TODO: Not correct for short orders
                 }
             } else {
                 // open a new trade with the executed order
@@ -304,6 +295,7 @@ impl LiveBroker {
                     instrument: order.instrument,
                 };
                 self.trades.push(trade);
+                println!("open trade: {}", current_bid);
 
                 // if an sl value is provided, create a contingent order for stop loss
                 if let Some(sl_value) = order.sl {
@@ -539,7 +531,7 @@ impl LiveBacktest {
     // async run method to drive simulation on new incoming live data without artificial throttling
     pub async fn run(&mut self, mut rx: UnboundedReceiver<LiveData>) {
         println!("starting live simulation...");
-        // initialize strategy with initial live data
+        // init strategy with initial live data
         self.strategy.init(&mut self.broker, &self.data);
         
         // continuously await new live data messages
@@ -558,8 +550,10 @@ impl LiveBacktest {
             
             // process each newly appended tick
             for tick in start_tick..end_tick {
-                self.broker.next(tick);
+                // strategy places orders first
                 self.strategy.next(&mut self.broker, tick);
+                // then the broker processes the tick (executing orders, updating equity, etc.)
+                self.broker.next(tick);
                 self.broker.print_live_stats(tick);
             }
         }
