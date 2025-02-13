@@ -4,8 +4,10 @@ rust_bt/data/*
 Cargo.lock
 
 rust_core/src/strategies/*
+!rust_core/src/strategies/statarb_spread.rs
 !rust_core/src/strategies/sma.rs
 !rust_core/src/strategies/simple_strategy.rs
+!rust_core/src/strategies/live_statarb_spread.rs
 # Build output
 target/
 dist/
