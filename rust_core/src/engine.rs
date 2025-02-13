@@ -10,9 +10,6 @@ use crate::plot::plot_equity;
 use crate::plot::plot_equity_and_benchmark;
 use crate::plot::plot_margin_usage;
 use serde::{Serialize, Deserialize};
-use std::io::Write;
-use std::thread::sleep;
-use std::time::Duration;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 // define custom error for order margin check
