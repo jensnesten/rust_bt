@@ -15,10 +15,10 @@ pub struct LiveStatArbSpreadStrategy {
 impl LiveStatArbSpreadStrategy {
     pub fn new() -> Self {
         LiveStatArbSpreadStrategy {
-            size: 10.0,
-            lookback: 0,
+            size: 50.0,
+            lookback: 20,
             zscore_threshold: 1.2,
-            stop_loss: 5.0 * 0.0075,
+            stop_loss: 10.0 * 0.0075,
             spread: Vec::new(),
             bid: Vec::new(),
             ask: Vec::new(),
@@ -45,10 +45,13 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
         // copy live prices (f64 is copy) to prevent borrow conflict
         let current_ask = ask[index];
         let current_bid = bid[index];
+        let previous_ask = ask[index - 1];
+        let previous_bid = bid[index - 1];
+        println!("current_ask: {}, current_bid: {}", current_ask, current_bid);
         
         // calculate current spread using local prices
-        let current_spread = current_ask - current_bid;
-        let current_log_spread = current_ask.ln() - current_bid.ln();
+        //let current_log_spread = current_ask.ln() - current_bid.ln();
+        let current_log_spread = (current_ask.ln() - current_bid.ln()) - (previous_ask.ln() - previous_bid.ln());
         
         // push current spread and maintain window size
         self.spread.push(current_log_spread);
@@ -67,9 +70,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
             .sum::<f64>() / ((self.spread.len() - 1) as f64))
             .sqrt();
         let zscore = (current_log_spread - spread_mean) / spread_std;
-        println!("spread_mean: {}", spread_mean);
-        println!("spread_std: {}", spread_std);
-        println!("zscore: {}", zscore);
+
 
         // short when zscore is high (overvalued)
         if zscore > self.zscore_threshold {
@@ -103,10 +104,9 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
                 // error handling (e.g., print warning)
             }
             self.positions.register_position(self.size);
-            //println!("long at {} (zscore: {})", current_bid, zscore);
+
         } else if zscore.abs() < self.zscore_threshold / 2.0 && !self.positions.is_empty() {
             // close trades only if positions exist; use mid price as exit price
-            let close_price = (current_bid + current_ask) / 2.0; // mid price
             broker.close_all_trades(index); // update broker to accept close_price
 
         }

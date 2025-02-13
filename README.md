@@ -153,7 +153,20 @@ impl LiveStrategy for MyLiveStrategy {
 }
 ```
 
-### 
+### Streaming
+
+The live engine is designed to handle streaming data from a live data source. The `LiveData` struct is used to store the live data, and the `LiveBroker` struct is used to process the live data. Our backend is currently setup to receive data from Saxo Bank's SaxoOpenAPI, but this can be easily extended to other data sources by modifying `rust_live/src/stream.rs`. To run as is, you need developer access to the SaxoOpenAPI and an API token. 
+
+The LiveData struct is made for CFD trading, so it only contains the `ask` and `bid` prices. If you want to trade other asset classes, you need to create a new data struct to include the relevant data.
+
+```rust
+pub struct LiveData {
+    pub instrument: Vec<String>,
+    pub date: Vec<String>,
+    pub ask: Vec<f64>,
+    pub bid: Vec<f64>,
+}
+```
 
 
 
