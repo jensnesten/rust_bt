@@ -10,8 +10,7 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 
 - High performance, low-latency 
 - Flexible, modular design
-- Complete tick-by-tick market simulation
-- Complete live trading engine 
+- Complete backtesting and live testing engine 
 - Market microstructure simulation, including bid-ask spread, slippage, commissions, etc.
 - Detailed trade and position management, fractional orders
 - Contingent orders (SL/TP), Auto-scaling methods
@@ -116,6 +115,7 @@ let closed_trade = Trade {
     exit_index: Some(index),
     sl_order: trade.sl_order,
     tp_order: trade.tp_order,
+    instrument: trade.instrument,
 };
 broker.cash += closed_trade.pnl();
 broker.closed_trades.push(closed_trade);

@@ -1,4 +1,5 @@
 // position management module for tracking multiple positions
+use crate::engine::Broker;
 
 #[derive(Debug, Clone)]
 pub struct PositionManager {
@@ -24,6 +25,7 @@ impl PositionManager {
     // check if we can open a new short position
     pub fn can_open_short(&self) -> bool {
         self.open_shorts < self.max_positions
+
     }
 
     // register a new position
@@ -58,4 +60,7 @@ impl PositionManager {
         self.open_longs = 0;
         self.open_shorts = 0;
     }
+    
+
+
 }

@@ -27,7 +27,7 @@ async fn main() {
         initial_live_data.clone(),
         strategy,
         100_000.0,  // live_cash
-        0.05,        // live_margin (no leverage)
+        0.05,        // live_margin 
         false,      // live_trade_on_close
         false,      // live_hedging
         false,      // live_exclusive_orders

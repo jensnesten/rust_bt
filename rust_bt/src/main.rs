@@ -8,7 +8,9 @@ use rust_core::strategies::sma::SmaStrategy;
 use rust_core::strategies::simple_strategy::SimpleStrategy;
 #[allow(unused_imports)]
 use rust_core::strategies::statarb_pairs::StatArbPairsStrategy;
+#[allow(unused_imports)]
 use rust_core::strategies::scaled_statarb_pairs::ScaledStatArbPairsStrategy;
+#[allow(unused_imports)]
 use rust_core::strategies::dynamic_pairs::DynamicPairsStrategy;
 use rust_core::data_handler::handle_ohlc;
 use std::time::Instant;

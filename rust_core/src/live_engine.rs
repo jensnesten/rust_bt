@@ -3,7 +3,6 @@
 use crate::util::as_str;
 #[allow(unused_imports)]
 use std::cmp::Ordering;
-use std::thread::current;
 use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc::UnboundedReceiver;
 
@@ -33,7 +32,6 @@ pub struct Order {
     pub tp: Option<f64>,
     // for contingent orders (sl/tp), parent_trade indicates which trade they relate to (by index)
     pub parent_trade: Option<usize>,
-    // instrument flag: 1 = primary (using Close), 2 = hedge (using Close2)
     pub instrument: u8,
 }
 
@@ -59,7 +57,6 @@ impl Trade {
             0.0
         }
     }
-
     // compute percent return of this trade
     pub fn pl_pct(&self) -> f64 {
         let exit = self.exit_price.unwrap_or(self.entry_price);
@@ -69,7 +66,6 @@ impl Trade {
             0.0
         }
     }
-
     // add helper method to Trade struct for cleaner code
     pub fn close(&mut self, index: usize, price: f64) {
         self.exit_price = Some(price);
@@ -130,7 +126,6 @@ impl LiveBroker {
         live_scaling_enabled: bool,
     ) -> Self {
         let n = live_data.ask.len();
-        let m = live_data.bid.len();
         LiveBroker {
             live_data: live_data,
             live_cash: live_cash,
@@ -260,7 +255,7 @@ impl LiveBroker {
 
         for order in orders_to_execute.iter() {
             // determine entry price based on order side
-            let entry_price = if order.size > 0.0 { current_bid } else { current_ask };
+            let entry_price = if order.size > 0.0 { current_ask } else { current_bid };
 
             let trade = Trade {
                 size: order.size,
@@ -337,9 +332,9 @@ impl LiveBroker {
         let current_bid = self.live_data.bid[index];
 
         let exit_price = if trade.size > 0.0 {
-            current_ask
-        } else {
             current_bid
+        } else {
+            current_ask
         };
 
         // create the closed trade using exit_price...
@@ -372,9 +367,9 @@ impl LiveBroker {
         let trades: Vec<_> = self.trades.drain(..).collect();
         for trade in trades {
             let exit_price = if trade.size > 0.0 {
-                current_ask
-            } else {
                 current_bid
+            } else {
+                current_ask
             };
             let closed_trade = Trade {
                 size: trade.size,
@@ -528,10 +523,8 @@ impl LiveBacktest {
 
     // async run method to drive simulation on new incoming live data without artificial throttling
     pub async fn run(&mut self, mut rx: UnboundedReceiver<LiveData>) {
-        println!("starting live simulation...");
         // init strategy with initial live data
         self.strategy.init(&mut self.broker, &self.data);
-        
         // continuously await new live data messages
         while let Some(new_data) = rx.recv().await {
             // record the current number of ticks before appending new data

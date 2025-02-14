@@ -18,7 +18,7 @@ impl LiveStatArbSpreadStrategy {
             size: 50.0,
             lookback: 20,
             zscore_threshold: 1.2,
-            stop_loss: 10.0 * 0.0075,
+            stop_loss: 50.0 * 0.0075,
             spread: Vec::new(),
             bid: Vec::new(),
             ask: Vec::new(),
@@ -31,6 +31,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
     fn init(&mut self, _broker: &mut LiveBroker, _data: &LiveData) {
         // nothing to do; strategy will use broker's live data directly
     }
+
 
     fn next(&mut self, broker: &mut LiveBroker, index: usize) {
         // get live data and copy price values to avoid borrow conflicts
@@ -73,7 +74,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
 
 
         // short when zscore is high (overvalued)
-        if zscore > self.zscore_threshold {
+        if zscore > self.zscore_threshold && broker.current_margin_usage() < 0.65 {
             let order = Order {
                 size: -self.size,
                 sl: Some(current_bid + self.stop_loss),
@@ -90,7 +91,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
             //println!("short at {} (zscore: {})", current_ask, zscore);
         }
         // long when zscore is low (undervalued)
-        else if zscore < -self.zscore_threshold {
+        else if zscore < -self.zscore_threshold && broker.current_margin_usage() < 0.65{
             let order = Order {
                 size: self.size,
                 sl: Some(current_ask - self.stop_loss),
