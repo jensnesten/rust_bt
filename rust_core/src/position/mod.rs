@@ -1,6 +1,4 @@
 // position management module for tracking multiple positions
-use crate::engine::Broker;
-
 #[derive(Debug, Clone)]
 pub struct PositionManager {
     pub max_positions: usize,     // maximum number of positions allowed per side

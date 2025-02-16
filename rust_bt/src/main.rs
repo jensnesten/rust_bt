@@ -12,6 +12,7 @@ use rust_core::strategies::statarb_pairs::StatArbPairsStrategy;
 use rust_core::strategies::scaled_statarb_pairs::ScaledStatArbPairsStrategy;
 #[allow(unused_imports)]
 use rust_core::strategies::dynamic_pairs::DynamicPairsStrategy;
+#[allow(unused_imports)]
 use rust_core::strategies::ml_statarb_pairs::MLStatArbPairsStrategy;
 use rust_core::data_handler::handle_ohlc;
 use std::time::Instant;
@@ -25,14 +26,14 @@ fn main() {
     let cash = 100_000.0;
     let commission = 0.0;
     let bidask_spread = 0.0;
-    let margin = 0.5;
+    let margin = 0.05;
     let trade_on_close = false;
     let hedging = false;
     let exclusive_orders = false;
     let scaling_enabled = true;
 
     // boxed instance of strategy
-    let strategy: Box<dyn Strategy> = Box::new(MLStatArbPairsStrategy::new());
+    let strategy: Box<dyn Strategy> = Box::new(ScaledStatArbPairsStrategy::new());
 
     let mut backtest = Backtest::new(
         data,

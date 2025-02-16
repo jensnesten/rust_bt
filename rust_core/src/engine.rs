@@ -579,7 +579,11 @@ impl Broker {
     pub fn scale_order_size(&self, base_size: f64) -> f64 {
         // scale ordersize by current equity scaling and leverage (1 / margin)
         let current_equity = *self.equity.last().unwrap_or(&self.cash);
-        base_size * (current_equity / self.base_equity)
+        if current_equity > self.base_equity * 1.01 {
+            base_size * (current_equity / self.base_equity)
+        } else {
+            base_size
+        }
     }
 
     // update margin usage history whenever position changes and update max margin usage too

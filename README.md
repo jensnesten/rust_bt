@@ -1,8 +1,6 @@
 # rust_bt 🦀
 
-A high performance, low-latency backtesting engine for testing quantitative trading strategies in Rust. For backtesting on historical data OHLC data is required, and for live trading bid/ask data is required.
-
-The engine is designed to be used in conjunction with a strategy that implements the `Strategy` trait. The strategy is responsible for making trading decisions based on the `Broker` struct. 
+A high performance, low-latency backtesting engine for testing quantitative trading strategies in Rust. The engine is designed to be used in conjunction with a strategy that implements the `Strategy` trait. The strategy is responsible for making trading decisions based on the `Broker` struct. For backtesting on historical data OHLC data is required, and for live trading bid/ask data is required.
 
 It's barebones by design, and is intended to be expanded upon to align with the relevant market microstructure and fit the type of products you intend to trade.  
 
@@ -13,37 +11,47 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 - Complete backtesting and live testing engine 
 - Market microstructure simulation, including bid-ask spread, slippage, commissions, etc.
 - Detailed trade and position management, fractional orders
-- Contingent orders (SL/TP), Auto-scaling methods
+- Contingent orders (SL/TP)
 - Margin and leverage management for complex instruments
-- Pairs trading, Trading multiple instruments
+- Pairs trading, trading multiple instruments
 - Plotting and statistics
 
-## Project Components
+## Components
 
 - **rust_core**: the central trading engine  
-  *// houses strategies, orderbook logic, and data handling; the core intelligence behind the system*
+  - implements the core trading logic for backtesting and live trading
+  - houses strategies, orderbook logic, and data handling
+  - handles position management, margin and leverage
+
 
 - **rust_live**: the live trading interface  
-  *// connects the core trading logic to real-time data and execution; for live trading, navigate to the `rust_live` directory and run `cargo run`*
+  - connects the core trading logic to real-time data and execution
+  - handles live data streaming 
+  - To run the live trading engine, navigate to the `rust_live` directory and run `cargo run`
 
 - **rust_bt**: the backtesting interface  
-  *// integrates the core trading functionality with historical data for simulation; for backtesting, navigate to the `rust_bt` directory and run `cargo run`*
+  - connects the core trading logic to historical data and starts the backtest
+  - To run the backtest, navigate to the `rust_bt` directory and run `cargo run`
+
+
+- **rust_ml**: the machine learning interface  
+  - load models and run inference on live and historical data
+  - tools for converting scalers and pytorch models to rust
+
 
 ### How It Works
 
 the strategies are implemented in **rust_core**, but they are adapted to suit different operational environments:
 
 - **Backtesting Strategies**  
-  *// built for historical data simulation*  
   backtesting strategies use the standard engine types such as `Broker`, `OhlcData`, `Order`, and `Strategy`.
   these types are designed to work with preloaded historical market data, allowing the simulation of trades over past time periods. the backtesting engine in **rust_bt** orchestrates the process, ensuring that trades are simulated in a controlled, time-sequential manner.
 
 - **Live Trading Strategies**  
-  *// built for processing real-time market data*  
   live strategies are implemented with dedicated live engine types like `LiveBroker`, `LiveData`, `Order`, and `LiveStrategy`.  
   These types are specifically designed to handle streaming market data and execute orders as market conditions evolve, ensuring that order placement, execution, and statistics (like pnl) update in real time.
 
-this design ensures that while the core trading logic remains consistent in **rust_core**, each operational mode (backtest or live) uses the appropriate interface to manage data, process orders, and update trade statistics optimally. For examples see the `rust_core/src/strategies/statarb_spread.rs` and `rust_core/src/strategies/live_statarb_spread.rs` strategies.
+this design ensures that while the core trading logic remains consistent in **rust_core**, each operational mode (backtest or live) uses the appropriate interface to manage data, process orders, and update trade statistics optimally. 
 
 ## Backtesting 
 
@@ -144,11 +152,11 @@ pub struct MyStrategy;
 
 impl LiveStrategy for MyLiveStrategy {
     fn init(&mut self, broker: &mut LiveBroker, data: &LiveData) {
-        // initialization can precompute indicators, etc..
+        // Nothing to do here when trading live
     }
 
     fn next(&mut self, broker: &mut LiveBroker, index: usize) {
-        // implement the strategy logic here
+        // implement the live strategy logic here
     }
 }
 ```
