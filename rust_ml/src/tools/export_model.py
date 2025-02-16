@@ -29,10 +29,10 @@ class DeepNN(nn.Module):
         return x
 
 model = DeepNN()
-model.load_state_dict(torch.load("../inference/models/model.pth"))
+model.load_state_dict(torch.load("../models/model.pth"))
 model.eval()
 
 example_input = torch.randn(1, 4)
 
 traced_model = torch.jit.trace(model, example_input)
-traced_model.save("../inference/models/model.pt")
+traced_model.save("../models/model.pt")

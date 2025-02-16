@@ -448,7 +448,7 @@ impl Broker {
                     //no wait it should work
                     self.cash += closed_trade.pnl();
                     self.closed_trades.push(closed_trade);
-                    println!("closed trade: {}", adjusted_price);
+                    //println!("closed trade: {}", adjusted_price);
                 }
             } else {
                 // stand-alone order: open a new trade
@@ -463,7 +463,7 @@ impl Broker {
                     instrument: order.instrument,
                 };
                 self.trades.push(trade);
-                println!("open trade: {}", adjusted_price);
+                //println!("open trade: {}", adjusted_price);
 
                 // if a stop loss price is provided (in the 'sl' field),
                 // create a contingent stop loss order to ensure losses are capped

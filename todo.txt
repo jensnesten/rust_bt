@@ -2,4 +2,4 @@
 - Handle multiple live instruments
 - Implement DNN statarb strat
 - add inference layer
-
+- better plotting with JS lightweight-charts
