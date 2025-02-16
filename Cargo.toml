@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "rust_core",
     "rust_bt",
-    "rust_live",
+    "rust_live", "api_test", "rust_ml",
 
 ]
 

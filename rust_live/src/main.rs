@@ -8,13 +8,18 @@ async fn main() {
     // print startup message
     println!("starting live trading engine...");
 
+    let reference_id = "US500";
+    let uic = 4913;
+
+
     // create an unbounded channel for live data
     let (tx, mut rx) = mpsc::unbounded_channel::<LiveData>();
 
     // spawn the streaming task; it continuously sends live data via the channel
     tokio::spawn(async move {
-        stream_live_data(tx).await;
+        stream_live_data(tx, &reference_id, uic).await;
     });
+    
 
     // wait for the first live data message to initialize the simulation
     let initial_live_data = rx.recv().await.expect("no live data received");

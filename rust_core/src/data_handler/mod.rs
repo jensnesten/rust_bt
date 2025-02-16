@@ -3,6 +3,7 @@ use std::error::Error;
 use crate::engine::OhlcData;
 use crate::live_engine::LiveData;
 use serde_json::Value;
+use regex::Regex;
 
 // data handler for simple csv
 pub fn handle_ohlc(path: &str) -> Result<OhlcData, Box<dyn Error>> {
@@ -44,7 +45,7 @@ pub fn handle_ohlc(path: &str) -> Result<OhlcData, Box<dyn Error>> {
 }
 
 pub fn parse_live_data(raw: &str) -> LiveData {
-    // create a LiveData instance with vector fields
+    // create a live data instance with vector fields
     let mut live_data = LiveData {
         instrument: Vec::new(),
         date: Vec::new(),
@@ -54,11 +55,17 @@ pub fn parse_live_data(raw: &str) -> LiveData {
 
     // find the first occurrence of '{'
     if let Some(idx) = raw.find('{') {
-        // everything before the '{' is assumed to be the instrument code
-        let instrument = raw[..idx]
-            .trim_matches(|c: char| !c.is_alphanumeric())
-            .to_string();
-        // the json_str starts from the '{'
+        // extract raw instrument string from before the json block
+        let raw_instrument = raw[..idx].trim_matches(|c: char| !c.is_alphanumeric());
+        // regex to capture letters followed by digits, ignoring any trailing extra characters
+        let re = Regex::new(r"^([A-Za-z]+(?:[0-9]+)?)").unwrap();
+        let instrument = if let Some(cap) = re.captures(raw_instrument) {
+            cap.get(1).unwrap().as_str().to_string()
+        } else {
+            raw_instrument.to_string()
+        };
+
+        // get the json part
         let json_str = &raw[idx..];
 
         if let Ok(parsed) = serde_json::from_str::<Value>(json_str) {
@@ -83,3 +90,4 @@ pub fn parse_live_data(raw: &str) -> LiveData {
     }
     live_data
 }
+

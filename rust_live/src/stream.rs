@@ -9,7 +9,7 @@ use rust_core::data_handler::parse_live_data;
 use rust_core::live_engine::LiveData;
 use tokio::sync::mpsc::UnboundedSender;
 
-pub async fn single() -> Vec<LiveData> {
+pub async fn single(reference_id: &str, uic: i32) -> Vec<LiveData> {
     dotenv().ok();
 
     // Load API credentials from .env
@@ -36,12 +36,12 @@ pub async fn single() -> Vec<LiveData> {
     let subscription_payload = serde_json::json!({
         "ContextId": context_id,
         "RefreshRate": 1000,
-        "ReferenceId": "price",
+        "ReferenceId": reference_id,
         "Arguments": {
             "ClientKey": client_key,
             "AccountKey": account_key,
             "AssetType": "CfdOnIndex",
-            "Uic": 4913
+            "Uic": uic
         }
     });
     let client = Client::new();
@@ -179,8 +179,11 @@ pub async fn pairs() {
     }
 }
 
+
+
+
 // continuously streams live data and sends parsed messages over the channel
-pub async fn stream_live_data(tx: UnboundedSender<LiveData>) {
+pub async fn stream_live_data(tx: UnboundedSender<LiveData>, reference_id: &str, uic: i32) {
     dotenv().ok();
 
     // load api credentials from .env
@@ -203,20 +206,22 @@ pub async fn stream_live_data(tx: UnboundedSender<LiveData>) {
     // split the websocket stream into write (unused) and read parts
     let (_write, mut read) = ws_stream.split();
 
+    let reference_id = reference_id.to_string();
+
     // send the subscription request via HTTP POST
     let subscription_payload = serde_json::json!({
         "ContextId": context_id,
         "RefreshRate": 1000,
-        "ReferenceId": "price",
+        "ReferenceId": reference_id,
         "Arguments": {
             "ClientKey": client_key,
             "AccountKey": account_key,
             "AssetType": "CfdOnIndex",
-            "Uic": 4913
+            "Uic": uic
         }
     });
     let client = Client::new();
-    let _response = client
+    let response = client
         .post("https://gateway.saxobank.com/sim/openapi/trade/v1/prices/subscriptions")
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", access_token))
@@ -224,7 +229,7 @@ pub async fn stream_live_data(tx: UnboundedSender<LiveData>) {
         .send()
         .await
         .expect("failed to send subscription request");
-    // println!("subscription response: {:?}", response.text().await.unwrap());
+     println!("subscription response: {:?}", response.text().await.unwrap());
 
     // continuously process websocket messages
     while let Some(msg) = read.next().await {
@@ -247,6 +252,10 @@ pub async fn stream_live_data(tx: UnboundedSender<LiveData>) {
         }
     }
 }
+
+
+
+
 
 pub async fn stream_live_data_pairs(tx: UnboundedSender<LiveData>) {
     dotenv().ok();

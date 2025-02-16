@@ -43,7 +43,7 @@ the strategies are implemented in **rust_core**, but they are adapted to suit di
   live strategies are implemented with dedicated live engine types like `LiveBroker`, `LiveData`, `Order`, and `LiveStrategy`.  
   These types are specifically designed to handle streaming market data and execute orders as market conditions evolve, ensuring that order placement, execution, and statistics (like pnl) update in real time.
 
-this design ensures that while the core trading logic remains consistent in **rust_core**, each operational mode (backtest or live) uses the appropriate interface to manage data, process orders, and update trade statistics optimally. For examples see the `rust_core/src/strategies/statarb_pairs.rs` and `rust_core/src/strategies/live_statarb_spread.rs` strategies.
+this design ensures that while the core trading logic remains consistent in **rust_core**, each operational mode (backtest or live) uses the appropriate interface to manage data, process orders, and update trade statistics optimally. For examples see the `rust_core/src/strategies/statarb_spread.rs` and `rust_core/src/strategies/live_statarb_spread.rs` strategies.
 
 ## Backtesting 
 

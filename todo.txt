@@ -1,3 +1,5 @@
 - GUI / Dashboard - better live stats
 - Handle multiple live instruments
 - Implement DNN statarb strat
+- add inference layer
+

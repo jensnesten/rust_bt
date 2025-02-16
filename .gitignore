@@ -3,6 +3,8 @@ rust_bt/data/*
 
 Cargo.lock
 
+api_test/
+
 rust_core/src/strategies/*
 !rust_core/src/strategies/statarb_spread.rs
 !rust_core/src/strategies/sma.rs

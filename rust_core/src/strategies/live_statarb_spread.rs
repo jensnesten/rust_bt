@@ -22,7 +22,7 @@ impl LiveStatArbSpreadStrategy {
             spread: Vec::new(),
             bid: Vec::new(),
             ask: Vec::new(),
-            positions: PositionManager::new(5),  // allow max 3 positions per side
+            positions: PositionManager::new(4),  // allow max 3 positions per side
         }
     }
 }
@@ -37,22 +37,23 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
         // get live data and copy price values to avoid borrow conflicts
         let ask = &broker.live_data.ask;
         let bid = &broker.live_data.bid;
+        let instrument = &broker.live_data.instrument;
         
         // avoid out of bounds: return if there's not enough data
-        if ask.len() <= index || bid.len() <= index {
-            return;
+        if ask.len() <= index || bid.len() <= index || instrument.len() <= index {
+            return; 
         }
         
         // copy live prices (f64 is copy) to prevent borrow conflict
         let current_ask = ask[index];
         let current_bid = bid[index];
-        let previous_ask = ask[index - 1];
-        let previous_bid = bid[index - 1];
+
+        println!("instrument - Uic: {}", instrument[index]);
         println!("current_ask: {}, current_bid: {}", current_ask, current_bid);
         
         // calculate current spread using local prices
         //let current_log_spread = current_ask.ln() - current_bid.ln();
-        let current_log_spread = (current_ask.ln() - current_bid.ln()) - (previous_ask.ln() - previous_bid.ln());
+        let current_log_spread = ((current_ask.ln() + current_bid.ln()) / 2.0).ln();
         
         // push current spread and maintain window size
         self.spread.push(current_log_spread);
@@ -77,7 +78,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
         if zscore > self.zscore_threshold && broker.current_margin_usage() < 0.65 {
             let order = Order {
                 size: -self.size,
-                sl: Some(current_bid + self.stop_loss),
+                sl: Some(current_ask + self.stop_loss),
                 tp: None,
                 limit: None,
                 stop: None,
@@ -94,7 +95,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
         else if zscore < -self.zscore_threshold && broker.current_margin_usage() < 0.65{
             let order = Order {
                 size: self.size,
-                sl: Some(current_ask - self.stop_loss),
+                sl: Some(current_bid - self.stop_loss),
                 tp: None,
                 limit: None,
                 stop: None,
