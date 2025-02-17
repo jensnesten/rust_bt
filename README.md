@@ -18,25 +18,25 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 
 ## Components
 
-- **rust_core**: the central trading engine  
-  - implements the core trading logic for backtesting and live trading
-  - houses strategies, orderbook logic, and data handling
-  - handles position management, margin and leverage
+- **rust_core**: The central trading engine  
+  - Implements the core trading logic for backtesting and live trading
+  - Houses strategies, orderbook logic, and data handling
+  - Handles position management, margin and leverage
 
 
-- **rust_live**: the live trading interface  
-  - connects the core trading logic to real-time data and execution
-  - handles live data streaming 
+- **rust_live**: The live trading interface  
+  - Connects the core trading logic to real-time data and execution
+  - Handles live data streaming 
   - To run the live trading engine, navigate to the `rust_live` directory and run `cargo run`
 
-- **rust_bt**: the backtesting interface  
-  - connects the core trading logic to historical data and starts the backtest
+- **rust_bt**: The backtesting interface  
+  - Connects the core trading logic to historical data and starts the backtest
   - To run the backtest, navigate to the `rust_bt` directory and run `cargo run`
 
 
-- **rust_ml**: the machine learning interface  
-  - load models and run inference on live and historical data
-  - tools for converting scalers and pytorch models to rust
+- **rust_ml**: The machine learning interface  
+  - Loads models and runs inference on live and historical data
+  - Tools for converting scalers and pytorch models to rust
 
 
 ### How It Works

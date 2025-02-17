@@ -5,6 +5,7 @@ use crate::util::as_str;
 use std::cmp::Ordering;
 use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc::UnboundedReceiver;
+use std::collections::HashMap;
 
 // define custom error for order margin check
 #[derive(Debug)]

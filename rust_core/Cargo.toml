@@ -21,6 +21,7 @@ regex = "1.9"
 tokio = { version = "1.36", features = ["full"] }
 tch = "0.19.0"
 anyhow = "1.0"
+nom = "8.0.0"
 
 rust_ml = { path = "../rust_ml" }
 
