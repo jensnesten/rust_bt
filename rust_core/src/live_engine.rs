@@ -7,22 +7,31 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc::UnboundedReceiver;
 use std::collections::HashMap;
 
-// define custom error for order margin check
+// Define custom error for order margin check.
 #[derive(Debug)]
 pub enum OrderError {
     MarginExceeded, // error if order notional exceeds available buying power
-    FractionalOrderNotAllowed, // new error type for fractional orders when not using leverage
+    FractionalOrderNotAllowed, // error for fractional orders when not using leverage
     TradeLimitExceeded, // error if new order would exceed allowed concurrent positions per side
 }
 
+/// A single tick snapshot for one instrument.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LiveData {
-    pub instrument: Vec<String>,
-    pub date: Vec<String>,
-    pub ask: Vec<f64>,
-    pub bid: Vec<f64>,
+pub struct TickSnapshot {
+    pub instrument: String,
+    pub date: String,
+    pub ask: f64,
+    pub bid: f64,
 }
 
+/// Hybrid live data: keeps a full history of ticks as well as a current snapshot per instrument.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LiveData {
+    pub ticks: Vec<TickSnapshot>,
+    pub current: HashMap<String, TickSnapshot>,
+}
+
+/// Order now uses a String to identify the instrument.
 #[derive(Clone, Debug)]
 pub struct Order {
     // positive size indicates a long order, negative a short
@@ -33,12 +42,13 @@ pub struct Order {
     pub tp: Option<f64>,
     // for contingent orders (sl/tp), parent_trade indicates which trade they relate to (by index)
     pub parent_trade: Option<usize>,
-    pub instrument: u8,
+    pub instrument: String,
 }
 
+/// Trade now uses a String to identify the instrument.
 #[derive(Clone)]
 pub struct Trade {
-    pub instrument: u8,
+    pub instrument: String,
     pub size: f64,
     pub entry_price: f64,
     pub entry_index: usize,
@@ -67,7 +77,7 @@ impl Trade {
             0.0
         }
     }
-    // add helper method to Trade struct for cleaner code
+    // helper method for closing a trade
     pub fn close(&mut self, index: usize, price: f64) {
         self.exit_price = Some(price);
         self.exit_index = Some(index);
@@ -95,6 +105,7 @@ impl Position {
     }
 }
 
+/// The live broker uses our hybrid LiveData.
 pub struct LiveBroker {
     pub live_data: LiveData,
     pub live_cash: f64,
@@ -105,7 +116,7 @@ pub struct LiveBroker {
     pub orders: Vec<Order>,
     pub trades: Vec<Trade>,      // active trades
     pub closed_trades: Vec<Trade>,
-    // elive_quity curve per tick
+    // equity curve per tick
     pub live_equity: Vec<f64>,
     pub live_max_margin_usage: f64, // track maximum margin usage (percentage)
     pub live_base_equity: f64,      // initial equity for scaling purposes
@@ -115,7 +126,7 @@ pub struct LiveBroker {
 }
 
 impl LiveBroker {
-    const MARGIN_CALL_THRESHOLD: f64 = 0.85; // 90% margin usage triggers margin call
+    const MARGIN_CALL_THRESHOLD: f64 = 0.85; // 85% margin usage triggers margin call
 
     pub fn new(
         live_data: LiveData,
@@ -126,26 +137,25 @@ impl LiveBroker {
         live_exclusive_orders: bool,
         live_scaling_enabled: bool,
     ) -> Self {
-        let n = live_data.ask.len();
+        let n = live_data.ticks.len();
         LiveBroker {
-            live_data: live_data,
-            live_cash: live_cash,
-            live_margin: live_margin,
-            live_trade_on_close: live_trade_on_close,
-            live_hedging: live_hedging,
-            live_exclusive_orders: live_exclusive_orders,
+            live_data,
+            live_cash,
+            live_margin,
+            live_trade_on_close,
+            live_hedging,
+            live_exclusive_orders,
             orders: Vec::new(),
             trades: Vec::new(),
             closed_trades: Vec::new(),
             live_equity: vec![live_cash; n],
             live_max_margin_usage: 0.0,
             live_base_equity: live_cash,
-            live_scaling_enabled: live_scaling_enabled,
+            live_scaling_enabled,
             live_margin_usage_history: vec![0.0],
             max_live_concurrent_trades: 0,
         }
     }
-
 
     // new_order: place a new order into the live orders queue
     pub fn new_order(&mut self, mut order: Order, current_price: f64) -> Result<(), OrderError> {
@@ -153,7 +163,7 @@ impl LiveBroker {
         if self.live_margin >= 1.0 && order.size.fract() != 0.0 {
             return Err(OrderError::FractionalOrderNotAllowed);
         }
-        // scale order size if scaling enabled
+        // scale order size if scaling is enabled
         if self.live_scaling_enabled {
             order.size = self.scale_order_size(order.size);
         }
@@ -163,7 +173,6 @@ impl LiveBroker {
         let available = self.available_buying_power();
         if order_notional > available {
             return Err(OrderError::MarginExceeded);
-            
         }
         // enforce trade limits (max three open trades per side) for non-contingent orders
         if order.parent_trade.is_none() {
@@ -194,60 +203,62 @@ impl LiveBroker {
         Ok(())
     }
 
-    // process_orders: check and execute orders using current live bid and ask prices
-    pub fn process_orders(&mut self, index: usize) {
-        // get current prices from live data
-        let current_ask = self.live_data.ask[index];
-        let current_bid = self.live_data.bid[index];
+    // process_orders: check and execute orders using current live bid and ask prices.
+    // For each order, we look up the current snapshot by instrument.
+    pub fn process_orders(&mut self, _index: usize) {
         let mut executed_order_indices: Vec<usize> = Vec::new();
 
         for (i, order) in self.orders.iter_mut().enumerate() {
-            // handle stop orders
-            if let Some(stop_price) = order.stop {
-                let is_stop_hit = if order.parent_trade.is_some() {
-                    // contingent order: for long, trigger if current bid <= stop;
-                    // for short, if current ask >= stop
-                    if order.size > 0.0 {
-                        current_bid <= stop_price
+            // Look up current snapshot for the order's instrument.
+            if let Some(current_tick) = self.live_data.current.get(&order.instrument) {
+                let current_ask = current_tick.ask;
+                let current_bid = current_tick.bid;
+
+                // Handle stop orders.
+                if let Some(stop_price) = order.stop {
+                    let is_stop_hit = if order.parent_trade.is_some() {
+                        // contingent order: for long, trigger if current bid <= stop;
+                        // for short, if current ask >= stop.
+                        if order.size > 0.0 {
+                            current_bid <= stop_price
+                        } else {
+                            current_ask >= stop_price
+                        }
                     } else {
-                        current_ask >= stop_price
-                    }
-                } else {
-                    // stop entry order: for long, trigger when ask >= stop;
-                    // for short, when bid <= stop
-                    if order.size > 0.0 {
-                        current_ask >= stop_price
+                        // stop entry order: for long, trigger when ask >= stop;
+                        // for short, when bid <= stop.
+                        if order.size > 0.0 {
+                            current_ask >= stop_price
+                        } else {
+                            current_bid <= stop_price
+                        }
+                    };
+                    if is_stop_hit {
+                        order.stop = None; // clear stop to treat as market order.
                     } else {
-                        current_bid <= stop_price
+                        continue;
                     }
-                };
-                if is_stop_hit {
-                    // clear stop price to treat the order as a market order
-                    order.stop = None;
-                } else {
-                    continue;
                 }
-            }
-            // handle limit orders: for long, execute if current ask <= limit;
-            // for short, if current bid >= limit
-            if let Some(limit_price) = order.limit {
-                let is_limit_hit = if order.size > 0.0 {
-                    current_ask <= limit_price
+                // Handle limit orders.
+                if let Some(limit_price) = order.limit {
+                    let is_limit_hit = if order.size > 0.0 {
+                        current_ask <= limit_price
+                    } else {
+                        current_bid >= limit_price
+                    };
+                    if is_limit_hit {
+                        executed_order_indices.push(i);
+                    } else {
+                        continue;
+                    }
                 } else {
-                    current_bid >= limit_price
-                };
-                if is_limit_hit {
+                    // Market order: execute immediately.
                     executed_order_indices.push(i);
-                } else {
-                    continue;
                 }
-            } else {
-                // market order: execute immediately
-                executed_order_indices.push(i);
             }
         }
 
-        // clone orders to execute then remove them from the queue in descending order to avoid index issues
+        // Clone orders to execute and remove them from the queue in descending order.
         let orders_to_execute: Vec<Order> = executed_order_indices.iter().map(|&i| self.orders[i].clone()).collect();
         executed_order_indices.sort_unstable_by(|a, b| b.cmp(a));
         for i in executed_order_indices {
@@ -255,164 +266,144 @@ impl LiveBroker {
         }
 
         for order in orders_to_execute.iter() {
-            // determine entry price based on order side
-            let entry_price = if order.size > 0.0 { current_ask } else { current_bid };
+            // Get the current snapshot for this order.
+            if let Some(current_tick) = self.live_data.current.get(&order.instrument) {
+                let entry_price = if order.size > 0.0 { current_tick.ask } else { current_tick.bid };
 
-            let trade = Trade {
-                size: order.size,
-                entry_price,  // use computed entry price
-                entry_index: index,
-                exit_price: None,
-                exit_index: None,
-                sl_order: None,
-                tp_order: None,
-                instrument: order.instrument,
-            };
-            self.trades.push(trade);
-
-            // print open trade message
-            if order.size > 0.0 {
-                println!("open long: {}", entry_price);
-            } else {
-                println!("open short: {}", entry_price);
-            }
-
-            // if stop loss provided, create contingent order for sl
-            if let Some(sl_value) = order.sl {
-                let trade_idx = self.trades.len() - 1; // index of new trade
-                let contingent_order = Order {
+                let trade = Trade {
                     size: order.size,
-                    limit: None,
-                    stop: Some(sl_value),
-                    sl: None,
-                    tp: order.tp,
-                    parent_trade: Some(trade_idx),
-                    instrument: order.instrument,
+                    entry_price,
+                    entry_index: 0, // For live trading you may record a tick counter or timestamp.
+                    exit_price: None,
+                    exit_index: None,
+                    sl_order: None,
+                    tp_order: None,
+                    instrument: order.instrument.clone(),
                 };
-                self.orders.push(contingent_order);
-                // print contingent order message using proper side
+                self.trades.push(trade);
+
                 if order.size > 0.0 {
-                    println!("long stop loss: {}", sl_value);
+                    println!("open long on {}: {}", order.instrument, entry_price);
                 } else {
-                    println!("short stop loss: {}", sl_value);
+                    println!("open short on {}: {}", order.instrument, entry_price);
+                }
+
+                // If a stop loss is provided, create a contingent order.
+                if let Some(sl_value) = order.sl {
+                    let trade_idx = self.trades.len() - 1; // index of new trade
+                    let contingent_order = Order {
+                        size: order.size,
+                        limit: None,
+                        stop: Some(sl_value),
+                        sl: None,
+                        tp: order.tp,
+                        parent_trade: Some(trade_idx),
+                        instrument: order.instrument.clone(),
+                    };
+                    self.orders.push(contingent_order);
+                    if order.size > 0.0 {
+                        println!("{} long stop loss set at: {}", order.instrument, sl_value);
+                    } else {
+                        println!("{} short stop loss set at: {}", order.instrument, sl_value);
+                    }
                 }
             }
         }
     }
 
-    // update_equity: recalc live equity = live_cash + pnl from open trades
-    pub fn update_equity(&mut self, index: usize) {
-        let current_ask = self.live_data.ask[index];
-        let current_bid = self.live_data.bid[index];
+    // update_equity: recalc live equity = live_cash + pnl from open trades.
+    // For each trade, we look up the latest price from the current snapshot.
+    pub fn update_equity(&mut self, _index: usize) {
         let pnl_sum: f64 = self.trades.iter().map(|trade| {
-            if trade.size > 0.0 {
-                // for long trades, pnl is calculated using current bid (selling price)
-                (current_bid - trade.entry_price) * trade.size
+            if let Some(current_tick) = self.live_data.current.get(&trade.instrument) {
+                if trade.size > 0.0 {
+                    (current_tick.bid - trade.entry_price) * trade.size
+                } else {
+                    (trade.entry_price - current_tick.ask) * (-trade.size)
+                }
             } else {
-                // for short trades, pnl uses current ask (buying to cover)
-                (trade.entry_price - current_ask) * (-trade.size)
+                0.0
             }
         }).sum();
         let equity_value = self.live_cash + pnl_sum;
-        if index < self.live_equity.len() {
-            self.live_equity[index] = equity_value;
-        } else {
-            self.live_equity.push(equity_value);
-        }
+        self.live_equity.push(equity_value);
     }
 
-    // close_position: close one open trade using the live prices
-    pub fn close_position(&mut self, trade_index: usize, index: usize) {
-        // remove trade so that the mutable borrow ends here
-        let trade = if trade_index < self.trades.len() {
-            self.trades.remove(trade_index)
-        } else {
+    // close_position: close one open trade using the current live prices.
+    pub fn close_position(&mut self, trade_index: usize, _index: usize) {
+        if trade_index >= self.trades.len() {
             return;
-        };
-        let current_ask = self.live_data.ask[index];
-        let current_bid = self.live_data.bid[index];
-
-        let exit_price = if trade.size > 0.0 {
-            current_bid
-        } else {
-            current_ask
-        };
-
-        // create the closed trade using exit_price...
-        let closed_trade = Trade {
-            size: trade.size,
-            entry_price: trade.entry_price,
-            entry_index: trade.entry_index,
-            exit_price: Some(exit_price),
-            exit_index: Some(index),
-            sl_order: trade.sl_order,
-            tp_order: trade.tp_order,
-            instrument: trade.instrument,
-        };
-        // update cash and record closed trade
-        self.live_cash += closed_trade.pnl();
-        self.closed_trades.push(closed_trade);
-        if trade.size > 0.0 {
-            println!("closed long: {}", exit_price);
-        } else {
-            println!("closed short: {}", exit_price);
         }
-    }
-
-    // close_all_trades: liquidate all open trades at current live prices
-    pub fn close_all_trades(&mut self, index: usize) {
-        let current_ask = self.live_data.ask[index];
-        let current_bid = self.live_data.bid[index];
-        let mut total_pnl = 0.0;
-        // collect trades to end the mutable borrow on self.live_trades
-        let trades: Vec<_> = self.trades.drain(..).collect();
-        for trade in trades {
-            let exit_price = if trade.size > 0.0 {
-                current_bid
-            } else {
-                current_ask
-            };
+        let trade = self.trades.remove(trade_index);
+        if let Some(current_tick) = self.live_data.current.get(&trade.instrument) {
+            let exit_price = if trade.size > 0.0 { current_tick.bid } else { current_tick.ask };
             let closed_trade = Trade {
                 size: trade.size,
                 entry_price: trade.entry_price,
                 entry_index: trade.entry_index,
                 exit_price: Some(exit_price),
-                exit_index: Some(index),
+                exit_index: Some(0),
                 sl_order: trade.sl_order,
                 tp_order: trade.tp_order,
-                instrument: trade.instrument,
+                instrument: trade.instrument.clone(),
             };
-            total_pnl += closed_trade.pnl();
+            self.live_cash += closed_trade.pnl();
             self.closed_trades.push(closed_trade);
             if trade.size > 0.0 {
-                println!("closed long: {}", exit_price);
+                println!("closed long on {}: {}", trade.instrument, exit_price);
             } else {
-                println!("closed short: {}", exit_price);
+                println!("closed short on {}: {}", trade.instrument, exit_price);
+            }
+        }
+    }
+
+    // close_all_trades: liquidate all open trades at current live prices.
+    pub fn close_all_trades(&mut self, _index: usize) {
+        let mut total_pnl = 0.0;
+        let trades: Vec<_> = self.trades.drain(..).collect();
+        for trade in trades {
+            if let Some(current_tick) = self.live_data.current.get(&trade.instrument) {
+                let exit_price = if trade.size > 0.0 { current_tick.bid } else { current_tick.ask };
+                let closed_trade = Trade {
+                    size: trade.size,
+                    entry_price: trade.entry_price,
+                    entry_index: trade.entry_index,
+                    exit_price: Some(exit_price),
+                    exit_index: Some(0),
+                    sl_order: trade.sl_order,
+                    tp_order: trade.tp_order,
+                    instrument: trade.instrument.clone(),
+                };
+                total_pnl += closed_trade.pnl();
+                self.closed_trades.push(closed_trade);
+                if trade.size > 0.0 {
+                    println!("closed long on {}: {}", trade.instrument, exit_price);
+                } else {
+                    println!("closed short on {}: {}", trade.instrument, exit_price);
+                }
             }
         }
         self.live_cash += total_pnl;
         self.orders.clear();
     }
 
-    // next: process one tick of live data
+    // next: process one tick of live data.
+    // In a backtest this could be called for each new tick, but here we assume that current prices come from the `current` snapshot.
     pub fn next(&mut self, index: usize) {
-        // update max concurrent trades count
         self.max_live_concurrent_trades = self.max_live_concurrent_trades.max(self.trades.len());
         self.process_orders(index);
         self.update_equity(index);
         self.check_margin_call(index);
-        // if equity is depleted, liquidate all trades and set cash to zero
-        if self.live_equity[index] <= 0.0 {
+        if *self.live_equity.last().unwrap_or(&self.live_cash) <= 0.0 {
             self.close_all_trades(index);
             self.live_cash = 0.0;
-            for t in index..self.live_equity.len() {
-                self.live_equity[t] = 0.0;
-            }
+            // Reset the equity history.
+            self.live_equity.push(0.0);
         }
         self.update_margin_usage();
     }
 
-    // check_margin_call: force liquidation if margin usage exceeds threshold
+    // check_margin_call: force liquidation if margin usage exceeds threshold.
     fn check_margin_call(&mut self, index: usize) {
         let usage = self.current_margin_usage();
         if usage > Self::MARGIN_CALL_THRESHOLD {
@@ -422,17 +413,14 @@ impl LiveBroker {
         }
     }
 
-    // available_buying_power: compute how much notional can be bought
     pub fn available_buying_power(&self) -> f64 {
         (self.live_cash / self.live_margin) - self.current_exposure()
     }
 
-    // current_exposure: sum the trader notional for every open trade
     pub fn current_exposure(&self) -> f64 {
         self.trades.iter().map(|trade| trade.size.abs() * trade.entry_price).sum()
     }
 
-    // current_margin_usage: ratio of current exposure to total allowed notional
     pub fn current_margin_usage(&self) -> f64 {
         if (self.live_margin - 1.0).abs() < std::f64::EPSILON {
             return 0.0;
@@ -445,7 +433,6 @@ impl LiveBroker {
         }
     }
 
-    // update_max_margin_usage: record the highest margin usage so far
     pub fn update_max_margin_usage(&mut self) {
         let usage = self.current_margin_usage();
         if usage > self.live_max_margin_usage {
@@ -453,13 +440,11 @@ impl LiveBroker {
         }
     }
 
-    // scale_order_size: adjust order size based on current equity scaling
     pub fn scale_order_size(&self, base_size: f64) -> f64 {
         let current_equity = *self.live_equity.last().unwrap_or(&self.live_cash);
         base_size * (current_equity / self.live_base_equity)
     }
 
-    // update_margin_usage: record current margin usage to history
     pub fn update_margin_usage(&mut self) {
         let usage = self.current_margin_usage();
         if usage > self.live_max_margin_usage {
@@ -468,19 +453,21 @@ impl LiveBroker {
         self.live_margin_usage_history.push(usage);
     }
 
-    // new method to print basic live trading stats in same console line
+    // new method to print basic live trading stats in one console line.
     pub fn print_live_stats(&self, tick: usize) {
-        // simple print line without ansi escape codes
-        println!(" \n tick: {} | cash: {:.2} | open trades: {} | closed trades: {} | equity: {:.2} | margin usage: {:.2}% \n",
+        println!(
+            "\n tick: {} | cash: {:.2} | open trades: {} | closed trades: {} | equity: {:.2} | margin usage: {:.2}% \n",
             tick,
             self.live_cash,
-            self.trades.len(),         // open trades are in trades vector
-            self.closed_trades.len(),  // closed trades are in closed_trades vector
+            self.trades.len(),
+            self.closed_trades.len(),
             self.live_equity.last().unwrap_or(&self.live_cash),
-            self.current_margin_usage() * 100.0);
+            self.current_margin_usage() * 100.0
+        );
     }
 }
 
+/// Strategy trait remains similar.
 pub trait LiveStrategy {
     fn init(&mut self, broker: &mut LiveBroker, data: &LiveData);
     fn next(&mut self, broker: &mut LiveBroker, index: usize);
@@ -488,7 +475,7 @@ pub trait LiveStrategy {
 
 pub type LiveStrategyRef = Box<dyn LiveStrategy>;
 
-
+/// The backtest driver.
 pub struct LiveBacktest {
     pub data: LiveData,
     pub broker: LiveBroker,
@@ -522,31 +509,30 @@ impl LiveBacktest {
         }
     }
 
-    // async run method to drive simulation on new incoming live data without artificial throttling
+    // The run method now expects incoming LiveData (hybrid type).
+    // For each incoming snapshot, we append its ticks to our history and update the current snapshot.
     pub async fn run(&mut self, mut rx: UnboundedReceiver<LiveData>) {
         // init strategy with initial live data
         self.strategy.init(&mut self.broker, &self.data);
-        // continuously await new live data messages
+        let mut tick: usize = self.broker.live_data.ticks.len();
         while let Some(new_data) = rx.recv().await {
-            // record the current number of ticks before appending new data
-            let start_tick = self.broker.live_data.ask.len();
-            
-            // append incoming live data tick(s) to the broker's live data
-            self.broker.live_data.instrument.extend(new_data.instrument);
-            self.broker.live_data.date.extend(new_data.date);
-            self.broker.live_data.ask.extend(new_data.ask);
-            self.broker.live_data.bid.extend(new_data.bid);
-            
-            // determine new tick count after appending data
-            let end_tick = self.broker.live_data.ask.len();
-            
-            // process each newly appended tick
-            for tick in start_tick..end_tick {
-                // strategy places orders first
+            // Append incoming ticks to the history.
+            self.broker.live_data.ticks.extend(new_data.ticks.iter().cloned());
+            // Update the current snapshot for each tick.
+            for tick_snapshot in new_data.ticks.iter() {
+                self.broker
+                    .live_data
+                    .current
+                    .insert(tick_snapshot.instrument.clone(), tick_snapshot.clone());
+            }
+            // Determine the new tick count.
+            let new_tick_count = self.broker.live_data.ticks.len();
+            // Process each newly appended tick.
+            for _ in tick..new_tick_count {
                 self.strategy.next(&mut self.broker, tick);
-                // then the broker processes the tick (executing orders, updating equity, etc.)
                 self.broker.next(tick);
                 self.broker.print_live_stats(tick);
+                tick += 1;
             }
         }
     }

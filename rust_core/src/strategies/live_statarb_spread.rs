@@ -35,20 +35,16 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
 
     fn next(&mut self, broker: &mut LiveBroker, index: usize) {
         // get live data and copy price values to avoid borrow conflicts
-        let ask = &broker.live_data.ask;
-        let bid = &broker.live_data.bid;
-        let instrument = &broker.live_data.instrument;
         
-        // avoid out of bounds: return if there's not enough data
-        if ask.len() <= index || bid.len() <= index || instrument.len() <= index {
-            return; 
-        }
+        let instrument = &broker.live_data.current.get("US500").unwrap().instrument;
+        
+     
         
         // copy live prices (f64 is copy) to prevent borrow conflict
-        let current_ask = ask[index];
-        let current_bid = bid[index];
+        let current_ask = &broker.live_data.current.get("US500").unwrap().ask;
+        let current_bid = &broker.live_data.current.get("US500").unwrap().bid;
 
-        println!("instrument - Uic: {}", instrument[index]);
+        println!("instrument - Uic: {}", instrument);
         println!("current_ask: {}, current_bid: {}", current_ask, current_bid);
         
         // calculate current spread using local prices
@@ -83,9 +79,9 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
                 limit: None,
                 stop: None,
                 parent_trade: None,
-                instrument: 1,
+                instrument: "US500".to_string(),
             };
-            if let Err(_e) = broker.new_order(order, current_ask) {
+            if let Err(_e) = broker.new_order(order, current_ask.clone()) {
                 // error handling (e.g., print warning)
             }
             self.positions.register_position(-self.size);
@@ -100,9 +96,9 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
                 limit: None,
                 stop: None,
                 parent_trade: None,
-                instrument: 1,
+                instrument: "US500".to_string(),
             };  
-            if let Err(_e) = broker.new_order(order, current_bid) {
+            if let Err(_e) = broker.new_order(order, current_bid.clone()) {
                 // error handling (e.g., print warning)
             }
             self.positions.register_position(self.size);

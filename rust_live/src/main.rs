@@ -5,12 +5,12 @@ use rust_live::stream::stream_live_data_pairs;
 use rust_core::live_engine::{LiveBacktest, LiveData, LiveStrategyRef};
 use rust_core::strategies::live_statarb_spread::LiveStatArbSpreadStrategy;
 use rust_core::strategies::live_statarb_pairs::LiveStatArbPairsStrategy;
-use rust_core::strategies::live_ml_statarb_spread::LiveMLStatArbSpreadStrategy;
+//use rust_core::strategies::live_ml_statarb_spread::LiveMLStatArbSpreadStrategy;
 
 #[tokio::main]
 async fn main() {
     // print startup message
-    println!("starting live trading engine...");
+    println!("starting live testing engine...");
 
     // create a channel for live data
     let (tx, mut rx) = mpsc::unbounded_channel::<LiveData>();
@@ -27,8 +27,6 @@ async fn main() {
             pairs(tx1, reference_id1, uic1, reference_id2, uic2).await;
         }
     });
-
-
 
     // wait for initial data from both streams (customize as needed)
     let initial_data1 = rx.recv().await.expect("no live data from instrument 1");

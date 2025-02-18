@@ -1,5 +1,5 @@
 - GUI / Dashboard - better live stats
-- Handle multiple live instruments
-- Implement DNN statarb strat
-- add inference layer
 - better plotting with JS lightweight-charts
+- calculate spread (multiple instruments)
+- If only bid or ask is updated, dont revert to mid price
+- fix parsing
