@@ -49,7 +49,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
         
         // calculate current spread using local prices
         //let current_log_spread = current_ask.ln() - current_bid.ln();
-        let current_log_spread = ((current_ask.ln() + current_bid.ln()) / 2.0).ln();
+        let current_log_spread = ((current_ask + current_bid) / 2.0).ln();
         
         // push current spread and maintain window size
         self.spread.push(current_log_spread);

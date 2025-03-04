@@ -10,8 +10,8 @@ pub struct SmaStrategy {
 impl SmaStrategy {
     pub fn new() -> Self {
         SmaStrategy {
-            sma_period: 100,
-            sma_period_2: 40,
+            sma_period: 10,
+            sma_period_2: 20,
             close: Vec::new(),
         }
     }
@@ -45,7 +45,7 @@ impl Strategy for SmaStrategy {
         if prev_diff <= 0.0 && curr_diff > 0.0 {
             // bullish cross: only buy when the difference switches from non-positive to positive
             let order = Order {
-                size: 10.0,
+                size: 30.0,
                 tp: None,
                 sl: None,
                 limit: None,

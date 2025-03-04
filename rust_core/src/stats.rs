@@ -40,6 +40,7 @@ pub struct Stats {
     pub profit_factor: f64,
     pub avg_win: f64,
     pub avg_loss: f64,
+    pub alpha_risk_adjusted: f64,
     pub alpha: f64,
     pub beta: f64,
     // new field for maximum margin usage (percentage)
@@ -67,8 +68,19 @@ fn compute_beta(equity: &[f64], market_prices: &[f64]) -> f64 {
     let mut market_returns = Vec::with_capacity(market_prices.len() - 1);
     
     for i in 1..equity.len() {
-        let equity_return = (equity[i] - equity[i - 1]) / equity[i - 1];
-        let market_return = (market_prices[i] - market_prices[i - 1]) / market_prices[i - 1];
+        // Use simple returns as fallbacks for problematic points
+        let equity_return = if equity[i] > 0.0 && equity[i-1] > 0.0 {
+            (equity[i] / equity[i-1]).ln()
+        } else {
+            (equity[i] - equity[i - 1]) / equity[i - 1]
+        };
+        
+        let market_return = if market_prices[i] > 0.0 && market_prices[i-1] > 0.0 {
+            (market_prices[i] / market_prices[i-1]).ln()
+        } else {
+            (market_prices[i] - market_prices[i - 1]) / market_prices[i - 1]
+        };
+        
         equity_returns.push(equity_return);
         market_returns.push(market_return);
     }
@@ -254,6 +266,8 @@ pub fn compute_stats(
 
     let alpha = return_pct - buy_hold_return_pct;
     let beta = compute_beta(equity, &ohlc.close);
+    let alpha_risk_adjusted = (return_pct - risk_free_rate * 100.0) - beta *(buy_hold_return_pct - risk_free_rate * 100.0);
+
 
     Stats {
         start,
@@ -277,6 +291,7 @@ pub fn compute_stats(
         win_rate_pct,
         best_trade,
         worst_trade,
+        alpha_risk_adjusted,
         alpha,
         beta,
         max_margin_usage,
@@ -306,6 +321,7 @@ impl fmt::Display for Stats {
         writeln!(f, "{:<35} {:>15.2}", "Avg. Loss [$]", self.avg_loss)?;
         writeln!(f, "{:<35} {:>15.2}", "Beta", self.beta)?;
         writeln!(f, "{:<35} {:>15.2}", "Alpha [%]", self.alpha)?;
+        writeln!(f, "{:<35} {:>15.2}", "Alpha Risk Adjusted [%]", self.alpha_risk_adjusted)?;
         writeln!(f, "{:<35} {:>15.2}", "Return Ann [%]", self.return_ann_pct)?;
         writeln!(f, "{:<35} {:>15.2}", "Volatility Ann [%]", self.volatility_ann_pct)?;
         writeln!(f, "{:<35} {:>15.2}", "Max Margin Usage [%]", self.max_margin_usage * 100.0)?;

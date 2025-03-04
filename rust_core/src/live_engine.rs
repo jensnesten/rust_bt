@@ -268,7 +268,7 @@ impl LiveBroker {
         for order in orders_to_execute.iter() {
             // Get the current snapshot for this order.
             if let Some(current_tick) = self.live_data.current.get(&order.instrument) {
-                let entry_price = if order.size > 0.0 { current_tick.ask } else { current_tick.bid };
+                let entry_price = if order.size > 0.0 { current_tick.bid } else { current_tick.ask };
 
                 let trade = Trade {
                     size: order.size,
@@ -317,9 +317,9 @@ impl LiveBroker {
         let pnl_sum: f64 = self.trades.iter().map(|trade| {
             if let Some(current_tick) = self.live_data.current.get(&trade.instrument) {
                 if trade.size > 0.0 {
-                    (current_tick.bid - trade.entry_price) * trade.size
+                    (current_tick.ask - trade.entry_price) * trade.size
                 } else {
-                    (trade.entry_price - current_tick.ask) * (-trade.size)
+                    (trade.entry_price - current_tick.bid) * (-trade.size)
                 }
             } else {
                 0.0
@@ -336,7 +336,7 @@ impl LiveBroker {
         }
         let trade = self.trades.remove(trade_index);
         if let Some(current_tick) = self.live_data.current.get(&trade.instrument) {
-            let exit_price = if trade.size > 0.0 { current_tick.bid } else { current_tick.ask };
+            let exit_price = if trade.size > 0.0 { current_tick.ask } else { current_tick.bid };
             let closed_trade = Trade {
                 size: trade.size,
                 entry_price: trade.entry_price,
@@ -363,7 +363,7 @@ impl LiveBroker {
         let trades: Vec<_> = self.trades.drain(..).collect();
         for trade in trades {
             if let Some(current_tick) = self.live_data.current.get(&trade.instrument) {
-                let exit_price = if trade.size > 0.0 { current_tick.bid } else { current_tick.ask };
+                let exit_price = if trade.size > 0.0 { current_tick.ask } else { current_tick.bid };
                 let closed_trade = Trade {
                     size: trade.size,
                     entry_price: trade.entry_price,
@@ -480,6 +480,7 @@ pub struct LiveBacktest {
     pub data: LiveData,
     pub broker: LiveBroker,
     pub strategy: LiveStrategyRef,
+    equity_callback: Option<Box<dyn Fn(f64) + Send + Sync>>,
 }
 
 impl LiveBacktest {
@@ -506,7 +507,15 @@ impl LiveBacktest {
             data: live_data,
             broker,
             strategy: live_strategy,
+            equity_callback: None,
         }
+    }
+
+    pub fn set_equity_callback<F>(&mut self, callback: F)
+    where
+        F: Fn(f64) + Send + Sync + 'static,
+    {
+        self.equity_callback = Some(Box::new(callback));
     }
 
     // The run method now expects incoming LiveData (hybrid type).
@@ -533,6 +542,11 @@ impl LiveBacktest {
                 self.broker.next(tick);
                 self.broker.print_live_stats(tick);
                 tick += 1;
+            }
+
+            if let Some(ref callback) = self.equity_callback {
+                let current_equity = *self.broker.live_equity.last().unwrap_or(&self.broker.live_cash);
+                callback(current_equity);
             }
         }
     }

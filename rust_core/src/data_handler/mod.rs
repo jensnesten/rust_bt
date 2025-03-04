@@ -211,3 +211,119 @@ pub fn parse_live_data_with_reference_nom2(
 
     LiveData { ticks, current }
 }
+
+/// Parse potentially concatenated streaming data with multiple instruments
+pub fn parse_multipart_live_data(raw: &str) -> LiveData {
+    let mut ticks: Vec<TickSnapshot> = Vec::new();
+    let mut current: HashMap<String, TickSnapshot> = HashMap::new();
+
+    // Convert to bytes for safer manipulation
+    let raw_bytes = raw.as_bytes();
+    
+    // Instrument identifiers as byte patterns instead of strings
+    let us500_pattern = b"US500";
+    let djia_pattern = b"DJIA";
+    
+    // Find JSON objects - more resilient approach
+    let mut start_index = 0;
+    while start_index < raw_bytes.len() {
+        // Look for instrument identifiers
+        let mut instrument = String::new();
+        
+        // Check for US500
+        if start_index + us500_pattern.len() <= raw_bytes.len() &&
+           &raw_bytes[start_index..start_index + us500_pattern.len()] == us500_pattern {
+            instrument = "US500".to_string();
+        }
+        // Check for DJIA
+        else if start_index + djia_pattern.len() <= raw_bytes.len() &&
+                &raw_bytes[start_index..start_index + djia_pattern.len()] == djia_pattern {
+            instrument = "DJIA".to_string();
+        }
+        
+        // Skip if no instrument found
+        if instrument.is_empty() {
+            start_index += 1;
+            continue;
+        }
+        
+        // Find JSON start
+        let mut json_start = start_index;
+        while json_start < raw_bytes.len() {
+            if raw_bytes[json_start] == b'{' {
+                break;
+            }
+            json_start += 1;
+        }
+        
+        if json_start >= raw_bytes.len() {
+            start_index += 1;
+            continue;
+        }
+        
+        // Find JSON end (matching closing brace)
+        let mut json_end = json_start + 1;
+        let mut brace_count = 1;
+        
+        while json_end < raw_bytes.len() && brace_count > 0 {
+            if raw_bytes[json_end] == b'{' {
+                brace_count += 1;
+            } else if raw_bytes[json_end] == b'}' {
+                brace_count -= 1;
+            }
+            json_end += 1;
+        }
+        
+        // Extract JSON if we found a complete object
+        if brace_count == 0 {
+            // Safely convert bytes to string, replacing invalid UTF-8
+            let json_str = String::from_utf8_lossy(&raw_bytes[json_start..json_end]).to_string();
+            
+            // Parse JSON
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                if let Some(quote) = parsed.get("Quote") {
+                    let date = parsed.get("LastUpdated")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    
+                    // Extract bid/ask prices
+                    let (ask_val, bid_val) = if let (Some(a), Some(b)) = (
+                        quote.get("Ask").and_then(|v| v.as_f64()),
+                        quote.get("Bid").and_then(|v| v.as_f64()),
+                    ) {
+                        (a, b)
+                    } else if let Some(mid_val) = quote.get("Mid").and_then(|v| v.as_f64()) {
+                        (mid_val, mid_val)
+                    } else {
+                        (0.0, 0.0)
+                    };
+                    
+                    // Only process valid price data
+                    if ask_val > 0.0 || bid_val > 0.0 {
+                        let tick_snapshot = TickSnapshot {
+                            instrument: instrument.clone(),
+                            date,
+                            ask: ask_val,
+                            bid: bid_val,
+                        };
+                        
+                        ticks.push(tick_snapshot.clone());
+                        current.insert(instrument.clone(), tick_snapshot);
+                            
+                        // Debug output
+                        println!("{}: ask: {}, bid: {}", instrument, ask_val, bid_val);
+                    }
+                }
+            }
+            
+            // Move past this JSON object
+            start_index = json_end;
+        } else {
+            // If we couldn't find a complete JSON object, move forward
+            start_index += 1;
+        }
+    }
+    
+    LiveData { ticks, current }
+}

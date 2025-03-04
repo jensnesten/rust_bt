@@ -6,11 +6,24 @@ use rust_core::live_engine::{LiveBacktest, LiveData, LiveStrategyRef};
 use rust_core::strategies::live_statarb_spread::LiveStatArbSpreadStrategy;
 use rust_core::strategies::live_statarb_pairs::LiveStatArbPairsStrategy;
 //use rust_core::strategies::live_ml_statarb_spread::LiveMLStatArbSpreadStrategy;
+use rust_live::server::EquityChartServer;
+use std::sync::Arc;
+
 
 #[tokio::main]
 async fn main() {
     // print startup message
     println!("starting live testing engine...");
+
+    // Create and spawn the chart server
+    let chart_server = EquityChartServer::new();
+    let chart_server = Arc::new(chart_server);
+    let chart_server_clone = chart_server.clone();
+    
+    // Spawn the chart server
+    tokio::spawn(async move {
+        chart_server_clone.start_server(3000).await;
+    });
 
     // create a channel for live data
     let (tx, mut rx) = mpsc::unbounded_channel::<LiveData>();
@@ -32,7 +45,7 @@ async fn main() {
     let initial_data1 = rx.recv().await.expect("no live data from instrument 1");
 
     // create a live strategy (example using the pairs strategy)
-    let strategy: LiveStrategyRef = Box::new(LiveStatArbPairsStrategy::new());
+    let strategy: LiveStrategyRef = Box::new(LiveStatArbSpreadStrategy::new());
 
     // initialize live backtest with one of the initial messages, or merge the two
     let mut live_backtest = LiveBacktest::new(
@@ -48,6 +61,12 @@ async fn main() {
     
     // optionally set the second stream data
     live_backtest.broker.live_data = initial_data1;
+    
+    // Modify the LiveBacktest to update chart server with equity values
+    let chart_server_for_backtest = chart_server.clone();
+    live_backtest.set_equity_callback(move |equity| {
+        chart_server_for_backtest.update_equity(equity);
+    });
     
     // run the simulation consuming all incoming live data
     live_backtest.run(rx).await;

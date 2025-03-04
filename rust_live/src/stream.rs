@@ -5,7 +5,7 @@ use tungstenite::Message;
 use futures_util::StreamExt;
 use reqwest::Client;
 use chrono::Utc;
-use rust_core::data_handler::{parse_live_data_with_reference_nom2, parse_live_data_with_reference_nom};
+use rust_core::data_handler::{parse_live_data_with_reference_nom2, parse_live_data_with_reference_nom, parse_multipart_live_data};
 use rust_core::live_engine::LiveData;
 use tokio::sync::mpsc::UnboundedSender;
 use regex::Regex;
@@ -150,8 +150,7 @@ pub async fn stream_live_data(tx: UnboundedSender<LiveData>, reference_id: &str,
 }
 
 
-pub async fn pairs(tx: UnboundedSender<LiveData>,reference_id_1: &str, uic_1: i32, reference_id_2: &str, uic_2: i32) {
-
+pub async fn pairs(tx: UnboundedSender<LiveData>, reference_id_1: &str, uic_1: i32, reference_id_2: &str, uic_2: i32) {
     dotenv().ok();
 
     // Load API credentials from .env
@@ -169,7 +168,7 @@ pub async fn pairs(tx: UnboundedSender<LiveData>,reference_id_1: &str, uic_1: i3
     println!("Connecting to Saxo Bank WebSocket...");
     let (ws_stream, _) = connect_async(&streamer_url)
         .await
-        .expect("Failed to connect: Ensure TLS is enabled in your dependencies (e.g., with native-tls or rustls-tls-webpki-roots)");
+        .expect("Failed to connect: Ensure TLS is enabled in your dependencies");
     println!("Connected.");
 
     // Split the WebSocket stream into write (unused) and read parts.
@@ -224,30 +223,31 @@ pub async fn pairs(tx: UnboundedSender<LiveData>,reference_id_1: &str, uic_1: i3
         .expect("Failed to send subscription request for instrument 2");
     println!("Subscription response 2: {:?}", response2.text().await.unwrap());
 
-    // Process incoming WebSocket messages and output the JSON response as-is.
+    // Process incoming WebSocket messages
     while let Some(msg) = read.next().await {
         match msg {
-            Ok(Message::Text(text)) => {
-                
-            }
             Ok(Message::Binary(bin)) => {
+                // Convert binary data to string, replacing invalid UTF-8 sequences
                 let text = String::from_utf8_lossy(&bin);
-                let clean_text = clean_raw_text(&text, &[ "DJIA", "US500" ]);
-                println!("text: {:?}", clean_text);
-                let segments = split_messages(&clean_text, &[ "DJIA", "US500" ]);
-                for segment in segments {
-                    println!("Segment: {:?}", segment);
-                    // Now pass each segment to your parser:
-                    let live_data = parse_live_data_with_reference_nom2(&segment, "DJIA", "US500");
-                    // Process or send live_data as needed...
-                    let _ = tx.send(live_data);
+                
+                
+                // Process the entire message with our robust parser
+                let live_data = parse_multipart_live_data(&text);
+                
+                // Only send if we have data to send
+                if !live_data.ticks.is_empty() {
+                    if let Err(e) = tx.send(live_data) {
+                        eprintln!("Error sending live data: {}", e);
+                    }
                 }
             }
             Ok(other) => {
-                println!("received non-text message: {:?}", other);
+                println!("Received non-binary message: {:?}", other);
             }
             Err(e) => {
-                println!("websocket error: {:?}", e);
+                println!("WebSocket error: {:?}", e);
+                // Add a small delay before continuing
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
         }
     }
