@@ -16,6 +16,103 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 - Pairs trading, trading multiple instruments
 - Plotting and statistics
 
+```mermaid
+flowchart TD
+    %% External Data Sources
+    HCSV["Historical Data CSV"]:::external
+    LAPI["Live Data API"]:::external
+
+    %% Backtesting Interface (rust_bt)
+    subgraph "Backtesting Interface (rust_bt)"
+        BT["Backtesting Interface"]:::interface
+        BT_Main["Backtesting Main"]:::interface
+    end
+
+    %% Live Trading Interface (rust_live)
+    subgraph "Live Trading Interface (rust_live)"
+        LIVE["Live Trading Interface"]:::interface
+        Live_Stream["Live Data Stream"]:::interface
+        Live_Server["Trading Server"]:::interface
+        Live_Main["Live Main"]:::interface
+    end
+
+    %% Machine Learning Module (rust_ml)
+    subgraph "Machine Learning Module (rust_ml)"
+        ML["Machine Learning Module"]:::interface
+        ML_Inference["Inference Module"]:::interface
+        ML_Models["Pretrained Models"]:::interface
+        ML_Tools["Model Conversion Tools"]:::interface
+        ML_Util["ML Utilities"]:::interface
+    end
+
+    %% Core Trading Engine (rust_core)
+    subgraph "Core Trading Engine (rust_core)"
+        CORE["Core Engine"]:::core
+        CORE_Data["Data Handling"]:::core
+        CORE_Strategies["Strategies"]:::core
+        CORE_Position["Position & Trade Management"]:::core
+        CORE_Hedging["Hedging & Utilities"]:::core
+    end
+
+    %% Data Flow Arrows
+    HCSV -->|"input"| BT_Main
+    LAPI -->|"stream"| Live_Stream
+
+    BT_Main -->|"simulate"| BT
+    BT -->|"feeds"| CORE
+
+    Live_Stream -->|"channels"| LIVE
+    Live_Server --> LIVE
+    Live_Main --> LIVE
+    LIVE -->|"executes"| CORE
+
+    ML_Inference --> ML
+    ML_Models --> ML
+    ML_Tools --> ML
+    ML_Util --> ML
+    ML -->|"signals"| CORE
+
+    %% Internal Core Flow
+    CORE_Data -->|"processes"| CORE_Strategies
+    CORE_Strategies -->|"executes"| CORE_Position
+    CORE_Position -->|"manages"| CORE_Hedging
+    %% Core engine central connection
+    CORE --- CORE_Data
+    CORE --- CORE_Strategies
+    CORE --- CORE_Position
+    CORE --- CORE_Hedging
+
+    %% Click Events for rust_core
+    click CORE "https://github.com/jensnesten/rust_bt/tree/main/rust_core/"
+    click CORE_Data "https://github.com/jensnesten/rust_bt/blob/main/rust_core/src/data_handler/mod.rs"
+    click CORE_Strategies "https://github.com/jensnesten/rust_bt/tree/main/rust_core/src/strategies/"
+    click CORE_Position "https://github.com/jensnesten/rust_bt/blob/main/rust_core/src/position/mod.rs"
+    click CORE_Hedging "https://github.com/jensnesten/rust_bt/blob/main/rust_core/src/hedging/mod.rs"
+
+    %% Click Events for rust_bt
+    click BT "https://github.com/jensnesten/rust_bt/tree/main/rust_bt/"
+    click BT_Main "https://github.com/jensnesten/rust_bt/blob/main/rust_bt/src/main.rs"
+    click HCSV "https://github.com/jensnesten/rust_bt/blob/main/rust_bt/data/SP500_DJIA_2m_clean.csv"
+
+    %% Click Events for rust_live
+    click LIVE "https://github.com/jensnesten/rust_bt/tree/main/rust_live/"
+    click Live_Stream "https://github.com/jensnesten/rust_bt/blob/main/rust_live/src/stream.rs"
+    click Live_Server "https://github.com/jensnesten/rust_bt/blob/main/rust_live/src/server.rs"
+    click Live_Main "https://github.com/jensnesten/rust_bt/blob/main/rust_live/src/main.rs"
+
+    %% Click Events for rust_ml
+    click ML "https://github.com/jensnesten/rust_bt/tree/main/rust_ml/"
+    click ML_Inference "https://github.com/jensnesten/rust_bt/blob/main/rust_ml/src/inference/mod.rs"
+    click ML_Models "https://github.com/jensnesten/rust_bt/tree/main/rust_ml/src/models/"
+    click ML_Tools "https://github.com/jensnesten/rust_bt/tree/main/rust_ml/src/tools/"
+    click ML_Util "https://github.com/jensnesten/rust_bt/blob/main/rust_ml/src/scaler.rs"
+
+    %% Styles
+    classDef core fill:#ffe6aa,stroke:#b58900,stroke-width:2px;
+    classDef interface fill:#cce5ff,stroke:#003366,stroke-width:2px;
+    classDef external fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
+```
+
 ## Components
 
 - **rust_core**: The central trading engine  
