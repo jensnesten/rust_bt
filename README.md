@@ -16,6 +16,44 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 - Pairs trading, trading multiple instruments
 - Plotting and statistics
 
+
+## Components
+
+- **rust_core**: The central trading engine  
+  - Implements the core trading logic for backtesting and live trading
+  - Houses strategies, orderbook logic, and data handling
+  - Handles position management, margin and leverage
+
+
+- **rust_live**: The live trading interface  
+  - Connects the core trading logic to real-time data and execution
+  - Handles live data streaming 
+  - To run the live trading engine, navigate to the `rust_live` directory and run `cargo run`
+
+- **rust_bt**: The backtesting interface  
+  - Connects the core trading logic to historical data and starts the backtest
+  - To run the backtest, navigate to the `rust_bt` directory and run `cargo run`
+
+
+- **rust_ml**: The machine learning interface  
+  - Loads models and runs inference on live and historical data
+  - Tools for converting scalers and pytorch models to rust
+
+
+### How It Works
+
+the strategies are implemented in **rust_core**, but they are adapted to suit different operational environments:
+
+- **Backtesting Strategies**  
+  backtesting strategies use the standard engine types such as `Broker`, `OhlcData`, `Order`, and `Strategy`.
+  these types are designed to work with preloaded historical market data, allowing the simulation of trades over past time periods. the backtesting engine in **rust_bt** orchestrates the process, ensuring that trades are simulated in a controlled, time-sequential manner.
+
+- **Live Trading Strategies**  
+  live strategies are implemented with dedicated live engine types like `LiveBroker`, `LiveData`, `Order`, and `LiveStrategy`.  
+  These types are specifically designed to handle streaming market data and execute orders as market conditions evolve, ensuring that order placement, execution, and statistics (like pnl) update in real time.
+
+this design ensures that while the core trading logic remains consistent in **rust_core**, each operational mode (backtest or live) uses the appropriate interface to manage data, process orders, and update trade statistics optimally. 
+
 ```mermaid
 flowchart TD
     %% External Data Sources
@@ -112,43 +150,6 @@ flowchart TD
     classDef interface fill:#cce5ff,stroke:#003366,stroke-width:2px;
     classDef external fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
 ```
-
-## Components
-
-- **rust_core**: The central trading engine  
-  - Implements the core trading logic for backtesting and live trading
-  - Houses strategies, orderbook logic, and data handling
-  - Handles position management, margin and leverage
-
-
-- **rust_live**: The live trading interface  
-  - Connects the core trading logic to real-time data and execution
-  - Handles live data streaming 
-  - To run the live trading engine, navigate to the `rust_live` directory and run `cargo run`
-
-- **rust_bt**: The backtesting interface  
-  - Connects the core trading logic to historical data and starts the backtest
-  - To run the backtest, navigate to the `rust_bt` directory and run `cargo run`
-
-
-- **rust_ml**: The machine learning interface  
-  - Loads models and runs inference on live and historical data
-  - Tools for converting scalers and pytorch models to rust
-
-
-### How It Works
-
-the strategies are implemented in **rust_core**, but they are adapted to suit different operational environments:
-
-- **Backtesting Strategies**  
-  backtesting strategies use the standard engine types such as `Broker`, `OhlcData`, `Order`, and `Strategy`.
-  these types are designed to work with preloaded historical market data, allowing the simulation of trades over past time periods. the backtesting engine in **rust_bt** orchestrates the process, ensuring that trades are simulated in a controlled, time-sequential manner.
-
-- **Live Trading Strategies**  
-  live strategies are implemented with dedicated live engine types like `LiveBroker`, `LiveData`, `Order`, and `LiveStrategy`.  
-  These types are specifically designed to handle streaming market data and execute orders as market conditions evolve, ensuring that order placement, execution, and statistics (like pnl) update in real time.
-
-this design ensures that while the core trading logic remains consistent in **rust_core**, each operational mode (backtest or live) uses the appropriate interface to manage data, process orders, and update trade statistics optimally. 
 
 ## Backtesting 
 
