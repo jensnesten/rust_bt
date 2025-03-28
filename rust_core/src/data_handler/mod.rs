@@ -262,7 +262,7 @@ pub fn parse_multipart_live_data(raw: &str) -> LiveData {
         }
         
         // Find JSON end (matching closing brace)
-        let mut json_end = json_start + 1;
+        let mut json_end = json_start + 1; 
         let mut brace_count = 1;
         
         while json_end < raw_bytes.len() && brace_count > 0 {

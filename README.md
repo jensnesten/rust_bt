@@ -261,21 +261,37 @@ impl LiveStrategy for MyLiveStrategy {
 
 ### Streaming
 
-The live engine is designed to handle streaming data from a live data source. The `LiveData` struct is used to store the live data, and the `LiveBroker` struct is used to process the live data. Our backend is currently setup to receive data from Saxo Bank's SaxoOpenAPI, but this can be easily extended to other data sources by modifying `rust_live/src/stream.rs`. To run as is, you need developer access to the SaxoOpenAPI and an API token. 
+The live engine is designed to handle streaming data from a live data source. The `LiveData` struct has been updated to offer a hybrid approach: it keeps a full history of ticks as well as a current snapshot for each instrument. Our backend is currently set up to receive data from Saxo Bank's SaxoOpenAPI, but this can be easily extended to other data sources by modifying `rust_live/src/stream.rs`. To run as is, you need developer access to the SaxoOpenAPI and an API token.
 
-The LiveData struct is made for CFD trading, so it only contains the `ask` and `bid` prices. If you want to trade other asset classes, you need to create a new data struct to include the relevant data.
-
+Every tick, which represents a snapshot for one instrument, is stored in a vector of `TickSnapshot`. Simultaneously, the latest tick for each instrument is maintained in a hashmap for quick access:
+  
 ```rust
+pub struct TickSnapshot {
+    pub instrument: String,
+    pub date: String,
+    pub ask: f64,
+    pub bid: f64,
+}
+
+/// Hybrid live data: keeps a full history of ticks as well as a current snapshot per instrument.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LiveData {
-    pub instrument: Vec<String>,
-    pub date: Vec<String>,
-    pub ask: Vec<f64>,
-    pub bid: Vec<f64>,
+    pub ticks: Vec<TickSnapshot>,
+    pub current: HashMap<String, TickSnapshot>,
 }
 ```
+Here the first parameter of the hashmap is a string corresponding to the symbol of the instrument.
 
+For example, in `/rust_live/main.rs` you can define instrument symbols like this:
 
+```rust
+// create a channel for live data
+let (tx, mut rx) = mpsc::unbounded_channel::<LiveData>();
 
+let reference_id1 = "US500";
+let uic1 = 4913;
+let reference_id2 = "DJIA";
+let uic2 = 4911;
+```
 
-
-
+The `reference_id` strings (e.g., "US500", "DJIA") represent the symbols of the instruments, which the user can set to uniquely identify each data stream.
