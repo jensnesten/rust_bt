@@ -36,13 +36,16 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
     fn next(&mut self, broker: &mut LiveBroker, index: usize) {
         // get live data and copy price values to avoid borrow conflicts
         
-        let instrument = &broker.live_data.current.get("US500").unwrap().instrument;
+        // safely handle missing instrument instead of unwrap()
+        let entry = match broker.live_data.current.get("US500") {
+            Some(e) => e,
+            None => return, // ignore if not present
+        };
+        let instrument = &entry.instrument;
         
-     
-        
-        // copy live prices (f64 is copy) to prevent borrow conflict
-        let current_ask = &broker.live_data.current.get("US500").unwrap().ask;
-        let current_bid = &broker.live_data.current.get("US500").unwrap().bid;
+        // copy live prices (f64 is Copy) to prevent borrow conflict
+        let current_ask = entry.ask;
+        let current_bid = entry.bid;
 
         println!("instrument - Uic: {}", instrument);
         println!("current_ask: {}, current_bid: {}", current_ask, current_bid);
@@ -81,7 +84,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
                 parent_trade: None,
                 instrument: "US500".to_string(),
             };
-            if let Err(_e) = broker.new_order(order, current_ask.clone()) {
+            if let Err(_e) = broker.new_order(order, current_ask) {
                 // error handling (e.g., print warning)
             }
             self.positions.register_position(-self.size);
@@ -98,7 +101,7 @@ impl LiveStrategy for LiveStatArbSpreadStrategy {
                 parent_trade: None,
                 instrument: "US500".to_string(),
             };  
-            if let Err(_e) = broker.new_order(order, current_bid.clone()) {
+            if let Err(_e) = broker.new_order(order, current_bid) {
                 // error handling (e.g., print warning)
             }
             self.positions.register_position(self.size);

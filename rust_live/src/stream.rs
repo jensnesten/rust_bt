@@ -161,15 +161,14 @@ pub async fn pairs(tx: UnboundedSender<LiveData>, reference_id_1: &str, uic_1: i
     // Build a context ID and streamer URL
     let context_id = format!("MyApp42069{}", Utc::now().timestamp_millis());
     let streamer_url = format!(
-        "wss://streaming.saxobank.com/sim/openapi/streamingws/connect?authorization=BEARER%20{}&contextId={}",
-        access_token, context_id
+        "wss://sim-streaming.saxobank.com/sim/oapi/streaming/ws/connect?contextId={}&authorization=BEARER%20{}",
+        context_id, access_token
     );
 
     println!("Connecting to Saxo Bank WebSocket...");
-    let (ws_stream, _) = connect_async(&streamer_url)
-        .await
-        .expect("Failed to connect: Ensure TLS is enabled in your dependencies");
-    println!("Connected.");
+    let (ws_stream, _) = connect_async(&streamer_url).await.unwrap_or_else(|e| {
+        panic!("Failed to connect to Saxo WebSocket: {:?}", e);
+    });
 
     // Split the WebSocket stream into write (unused) and read parts.
     let (_write, mut read) = ws_stream.split();
