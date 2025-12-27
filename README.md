@@ -40,14 +40,12 @@ It's barebones by design, and is intended to be expanded upon to align with the 
   - Tools for converting scalers and pytorch models to rust
 
 ## Getting started
-The backtesting engine works out of the box: simply navigate to rust_bt/rust_bt and run the cargo. To change strategies, modifying rust_bt/src/main.rs is necessary - by default the StatArb-spread strategy is loaded. If we take a look at main.rs in rust_bt/rust_bt - we see the following main function:
+The backtesting engine works out of the box: simply navigate to rust_bt/rust_bt and run the cargo. To change strategies, modifying rust_bt/src/main.rs is necessary - by default the StatArbSpreadStrategy is loaded. If we take a look at main.rs in rust_bt/rust_bt - we see the following main function:
 
 ```rust
 fn main() {
     //start time
     let start = Instant::now();
-
-    
     let data = handle_ohlc("~/rust_bt/rust_bt/data/SP500_DJIA_2m_clean.csv").expect("Failed to load CSV data"); // CHANGE PATH IF NEEDED
 
     let cash = 100_000.0;
@@ -59,7 +57,6 @@ fn main() {
     let exclusive_orders = false;
     let scaling_enabled = true;
 
-    // boxed instance of strategy
     let strategy: Box<dyn Strategy> = Box::new(StatArbSpreadStrategy::new()); //CHANGE THIS TO RUN OTHER STRATEGY 
 
     let mut backtest = Backtest::new(
@@ -76,7 +73,6 @@ fn main() {
     );
 
     backtest.run();
-
 } 
 ```
 Here our variable 'data' defines the historical data we intend to backtest on, found in erust_bt/rust_bt/data. Our variable 'strategy' is where we load our saved strategies form rust_bt/rust_core/strategies - the rest is self-explanatory. To utilize the ML inference module you need a C++ distribution of pytorch installed. See more here: https://docs.pytorch.org/cppdocs/installing.html.
