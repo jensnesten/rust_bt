@@ -16,6 +16,29 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 - Pairs trading, trading multiple instruments
 - Plotting and statistics
 
+
+## Components
+
+- **rust_core**: The central trading engine  
+  - Implements the core trading logic for backtesting and live trading
+  - Houses strategies, orderbook logic, and data handling
+  - Handles position management, margin and leverage
+
+
+- **rust_live**: The live trading interface  
+  - Connects the core trading logic to real-time data and execution
+  - Handles live data streaming 
+  - To run the live trading engine, navigate to the `rust_live` directory and run `cargo run`
+
+- **rust_bt**: The backtesting interface  
+  - Connects the core trading logic to historical data and starts the backtest
+  - To run the backtest, navigate to the `rust_bt` directory and run `cargo run`
+
+
+- **rust_ml**: The machine learning interface  
+  - Loads models and runs inference on live and historical data
+  - Tools for converting scalers and pytorch models to rust
+
 ## Getting started
 The backtesting engine works out of the box: simply navigate to rust_bt/rust_bt and run the cargo. To change strategies, modifying rust_bt/src/main.rs is necessary - by default the StatArb-spread strategy is loaded. If we take a look at main.rs in rust_bt/rust_bt - we see the following main function:
 
@@ -57,30 +80,6 @@ fn main() {
 } 
 ```
 Here our variable 'data' defines the historical data we intend to backtest on, found in erust_bt/rust_bt/data. Our variable 'strategy' is where we load our saved strategies form rust_bt/rust_core/strategies - the rest is self-explanatory. To utilize the ML inference module you need a C++ distribution of pytorch installed. See more here: https://docs.pytorch.org/cppdocs/installing.html
-
-
-## Components
-
-- **rust_core**: The central trading engine  
-  - Implements the core trading logic for backtesting and live trading
-  - Houses strategies, orderbook logic, and data handling
-  - Handles position management, margin and leverage
-
-
-- **rust_live**: The live trading interface  
-  - Connects the core trading logic to real-time data and execution
-  - Handles live data streaming 
-  - To run the live trading engine, navigate to the `rust_live` directory and run `cargo run`
-
-- **rust_bt**: The backtesting interface  
-  - Connects the core trading logic to historical data and starts the backtest
-  - To run the backtest, navigate to the `rust_bt` directory and run `cargo run`
-
-
-- **rust_ml**: The machine learning interface  
-  - Loads models and runs inference on live and historical data
-  - Tools for converting scalers and pytorch models to rust
-
 
 ### How It Works
 
@@ -192,6 +191,7 @@ flowchart TD
     classDef interface fill:#cce5ff,stroke:#003366,stroke-width:2px;
     classDef external fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
 ```
+
 
 ## Backtesting 
 
