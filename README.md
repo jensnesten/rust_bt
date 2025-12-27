@@ -16,6 +16,48 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 - Pairs trading, trading multiple instruments
 - Plotting and statistics
 
+## Getting started
+The backtesting engine works out of the box: simply navigate to rust_bt/rust_bt and run the cargo. To change strategies, modifying rust_bt/src/main.rs is necessary - by default the StatArb-spread strategy is loaded. If we take a look at main.rs in rust_bt/rust_bt - we see the following main function:
+
+```rust
+fn main() {
+    //start time
+    let start = Instant::now();
+
+    // CHANGE PATH
+    let data = handle_ohlc("/Users/jarlen/NHNTrading/rust_bt/rust_bt/data/SP500_DJIA_fyear_clean.csv").expect("Failed to load CSV data");
+
+    let cash = 100_000.0;
+    let commission = 0.0;
+    let bidask_spread = 0.0;
+    let margin = 0.05;
+    let trade_on_close = false;
+    let hedging = false;
+    let exclusive_orders = false;
+    let scaling_enabled = true;
+
+    // boxed instance of strategy
+    let strategy: Box<dyn Strategy> = Box::new(::new()); //CHANGE THIS TO RUN OTHER STRATEGY 
+
+    let mut backtest = Backtest::new(
+        data,
+        strategy,
+        cash,
+        commission,
+        bidask_spread,
+        margin,
+        trade_on_close,
+        hedging,
+        exclusive_orders,
+        scaling_enabled, // enable scaling
+    );
+
+    backtest.run();
+
+} 
+```
+Here our variable 'data' defines the historical data we intend to backtest on, found in erust_bt/rust_bt/data. Our variable 'strategy' is where we load our saved strategies form rust_bt/rust_core/strategies - the rest is self-explanatory. To utilize the ML inference module you need a C++ distribution of pytorch installed. See more here: https://docs.pytorch.org/cppdocs/installing.html
+
 
 ## Components
 
