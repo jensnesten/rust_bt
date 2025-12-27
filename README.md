@@ -60,7 +60,7 @@ fn main() {
     let scaling_enabled = true;
 
     // boxed instance of strategy
-    let strategy: Box<dyn Strategy> = Box::new(::new()); //CHANGE THIS TO RUN OTHER STRATEGY 
+    let strategy: Box<dyn Strategy> = Box::new(StatArbSpreadStrategy::new()); //CHANGE THIS TO RUN OTHER STRATEGY 
 
     let mut backtest = Backtest::new(
         data,
@@ -78,6 +78,33 @@ fn main() {
     backtest.run();
 
 } 
+```
+```bash
+Backtest Statistics:
+====================
+Start Date                          2024-04-01 00:00:00
+End Date                            2024-05-30 19:59:00
+Exposure Time [%]                             25.83
+Total Return [%]                              22.13
+Buy & Hold Return [%]                         -0.77
+Equity Final [$]                          122132.76
+Sharpe Ratio                                  44.19
+Max Drawdown [%]                              -0.74
+Profit Factor                                  1.72
+Total Trades                                   4858
+Win Rate [%]                                  57.04
+Best Trade [$]                              1665.21
+Worst Trade [$]                             -743.40
+Avg. Win [$]                                  19.04
+Avg. Loss [$]                                -15.82
+Beta                                          -0.20
+Alpha [%]                                     22.90
+Alpha Risk Adjusted [%]                       16.93
+Return Ann [%]                               244.49
+Volatility Ann [%]                             5.44
+Max Margin Usage [%]                          15.82
+====================
+time taken: 709.472375ms
 ```
 Here our variable 'data' defines the historical data we intend to backtest on, found in erust_bt/rust_bt/data. Our variable 'strategy' is where we load our saved strategies form rust_bt/rust_core/strategies - the rest is self-explanatory. To utilize the ML inference module you need a C++ distribution of pytorch installed. See more here: https://docs.pytorch.org/cppdocs/installing.html
 
