@@ -79,6 +79,10 @@ fn main() {
 
 } 
 ```
+Here our variable 'data' defines the historical data we intend to backtest on, found in erust_bt/rust_bt/data. Our variable 'strategy' is where we load our saved strategies form rust_bt/rust_core/strategies - the rest is self-explanatory. To utilize the ML inference module you need a C++ distribution of pytorch installed. See more here: https://docs.pytorch.org/cppdocs/installing.html.
+
+If we run as is, we get the following results:
+
 ```bash
 Backtest Statistics:
 ====================
@@ -106,7 +110,6 @@ Max Margin Usage [%]                          15.82
 ====================
 time taken: 709.472375ms
 ```
-Here our variable 'data' defines the historical data we intend to backtest on, found in erust_bt/rust_bt/data. Our variable 'strategy' is where we load our saved strategies form rust_bt/rust_core/strategies - the rest is self-explanatory. To utilize the ML inference module you need a C++ distribution of pytorch installed. See more here: https://docs.pytorch.org/cppdocs/installing.html
 
 ### How It Works
 
