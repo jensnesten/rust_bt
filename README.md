@@ -107,6 +107,8 @@ Max Margin Usage [%]                          15.82
 time taken: 709.472375ms
 ```
 
+![Equity Curve](rust_bt/output_equity.png)
+
 ### How It Works
 
 the strategies are implemented in **rust_core**, but they are adapted to suit different operational environments:
