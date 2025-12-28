@@ -111,17 +111,17 @@ time taken: 709.472375ms
 
 ### How It Works
 
-the strategies are implemented in **rust_core**, but they are adapted to suit different operational environments:
+The strategies are implemented in **rust_core**, but they are adapted to suit different operational environments:
 
 - **Backtesting Strategies**  
-  backtesting strategies use the standard engine types such as `Broker`, `OhlcData`, `Order`, and `Strategy`.
+  Backtesting strategies use the standard engine types such as `Broker`, `OhlcData`, `Order`, and `Strategy`.
   these types are designed to work with preloaded historical market data, allowing the simulation of trades over past time periods. the backtesting engine in **rust_bt** orchestrates the process, ensuring that trades are simulated in a controlled, time-sequential manner.
 
 - **Live Trading Strategies**  
-  live strategies are implemented with dedicated live engine types like `LiveBroker`, `LiveData`, `Order`, and `LiveStrategy`.  
+  Live strategies are implemented with dedicated live engine types like `LiveBroker`, `LiveData`, `Order`, and `LiveStrategy`.  
   These types are specifically designed to handle streaming market data and execute orders as market conditions evolve, ensuring that order placement, execution, and statistics (like pnl) update in real time.
 
-this design ensures that while the core trading logic remains consistent in **rust_core**, each operational mode (backtest or live) uses the appropriate interface to manage data, process orders, and update trade statistics optimally. 
+This design ensures that while the core trading logic remains consistent in **rust_core**, each operational mode (backtest or live) uses the appropriate interface to manage data, process orders, and update trade statistics optimally. 
 
 ```mermaid
 flowchart TD
