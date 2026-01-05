@@ -14,7 +14,7 @@ It's barebones by design, and is intended to be expanded upon to align with the 
 - Contingent orders (SL/TP)
 - Margin and leverage management for complex instruments
 - Pairs trading, trading multiple instruments
-- Plotting and statistics
+- Plotting and statistics 
 
 
 ## Components
